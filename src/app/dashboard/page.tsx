@@ -5,6 +5,7 @@ import { getLibrary, getMyBookings, getWatchedClipIds } from "@/lib/data";
 import { serviceById, formatPrice, isOral } from "@/lib/services";
 import { Chip, StatusChip } from "@/components/status-chip";
 import { LocalTime } from "@/components/local-time";
+import { requestTime } from "@/lib/format";
 import { CancelButton } from "./cancel-button";
 import { Greeting } from "./greeting";
 
@@ -18,7 +19,7 @@ export default async function DashboardPage() {
     getWatchedClipIds(viewer.id),
   ]);
 
-  const now = Date.now();
+  const now = requestTime();
   const upcoming = bookings
     .filter((b) => Date.parse(b.ends_at) > now && (b.status === "cleared" || b.status === "pending"))
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at));

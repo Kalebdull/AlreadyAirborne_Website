@@ -16,9 +16,9 @@ Live canvas: https://claude.ai/artifact/NgpdoNieYaTUSuj8HB37Va (the `.dc.html` f
 - Logo: green flight-path-marker symbol + "AlreadyAirborne".
 
 ## Status (2026-11-06)
-- [x] Next.js 16 + Tailwind scaffold (not yet customized)
+- [x] Next.js 16 + Tailwind scaffold
 - [x] Design approved as a "good start"
+- [x] Built: auth, clip library + progress, booking requests, dashboard, admin (requests / clips / settings), 404 + loading pages
 - [ ] Content from owner: name, IG handle, ratings, bio, photo, Zoom link, time zone + weekly hours, clip files/titles/topics
 - [ ] Supabase project URL + anon key; re-run `gh auth login` and `supabase login`
-- [ ] Build: auth, clip library + progress, booking requests, admin approve/decline page, emails
-- Note: `next.config.ts` has `cacheComponents` on — plan is to turn it off (nearly every page reads the session).
+- [ ] Later: email notifications to you on new requests / to students on clear (e.g. Resend)

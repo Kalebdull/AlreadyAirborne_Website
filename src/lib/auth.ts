@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { hasSupabase } from "@/lib/supabase/env";
 
@@ -13,6 +14,8 @@ export type Viewer = {
 
 // The one place that reads the session. Cached per request.
 export const getViewer = cache(async (): Promise<Viewer | null> => {
+  // Always per-request, even before Supabase keys exist at build time.
+  await connection();
   if (!hasSupabase) return null;
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();

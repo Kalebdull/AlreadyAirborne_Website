@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getViewer } from "@/lib/auth";
 import { getBookingInputs } from "@/lib/data";
 import { buildSlots } from "@/lib/slots";
+import { requestTime } from "@/lib/format";
 import { serviceById, type ServiceId } from "@/lib/services";
 import { BookingForm } from "./booking-form";
 
@@ -12,7 +13,7 @@ export default async function BookPage({ searchParams }: PageProps<"/book">) {
   const { service } = await searchParams;
   const initialService = (typeof service === "string" && serviceById(service)?.id) || null;
 
-  const now = Date.now();
+  const now = requestTime();
   const to = new Date(now + 121 * 24 * 3_600_000).toISOString();
   const [viewer, { config, availability, busy }] = await Promise.all([
     getViewer(),
