@@ -36,11 +36,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${inter.variable} ${interTight.variable} ${jetbrains.variable} h-full`}
     >
       <body className="min-h-full flex flex-col">
         <SiteHeader />
-        <div className="flex-1 flex flex-col">{children}</div>
+        <div className="flex flex-1 flex-col">{children}</div>
         <SiteFooter />
         <Reveal />
       </body>

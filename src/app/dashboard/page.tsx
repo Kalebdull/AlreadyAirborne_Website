@@ -191,7 +191,7 @@ function Gauge({ pct }: { pct: number }) {
       <svg width="180" height="180" viewBox="0 0 180 180" aria-hidden className="rotate-[135deg]">
         <circle cx="90" cy="90" r={r} fill="none" stroke="#2c2c2e" strokeWidth="12" strokeDasharray={`${track} ${c}`} strokeLinecap="round" />
         {pct > 0 && (
-          <circle cx="90" cy="90" r={r} fill="none" stroke="#f048c8" strokeWidth="12" strokeDasharray={`${(track * pct) / 100} ${c}`} strokeLinecap="round" />
+          <circle className="gauge-arc" cx="90" cy="90" r={r} fill="none" stroke="#f048c8" strokeWidth="12" strokeDasharray={`${(track * pct) / 100} ${c}`} strokeLinecap="round" />
         )}
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">

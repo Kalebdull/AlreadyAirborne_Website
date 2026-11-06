@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ViewTransition } from "react";
 import { getViewer } from "@/lib/auth";
 import { getLibrary, getWatchedClipIds, type Clip } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
@@ -98,7 +99,8 @@ function ClipCard({ clip, index, watched, poster }: { clip: Clip; index: number;
       href={`/library/${clip.id}`}
       className="group flex w-[46vw] max-w-[220px] shrink-0 snap-start flex-col gap-3 md:w-auto md:max-w-none"
     >
-      <div className="relative aspect-[9/16] overflow-hidden rounded-[22px] bg-card shadow-[0_0_0_1px_#2c2c2e] transition-transform duration-300 group-hover:-translate-y-1">
+      <ViewTransition name={`clip-${clip.id}`} share="morph" default="none">
+      <div className="relative aspect-[9/16] overflow-hidden rounded-[22px] bg-card shadow-[0_0_0_1px_#2c2c2e] transition-transform duration-500 group-hover:-translate-y-1.5">
         {poster ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={poster} alt="" className="h-full w-full object-cover" />
@@ -119,6 +121,7 @@ function ClipCard({ clip, index, watched, poster }: { clip: Clip; index: number;
           </span>
         ) : null}
       </div>
+      </ViewTransition>
       <span className={`text-[15px] leading-snug ${watched ? "text-mute" : "text-ink"}`}>{clip.title}</span>
     </Link>
   );

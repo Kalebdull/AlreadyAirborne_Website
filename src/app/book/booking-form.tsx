@@ -224,7 +224,7 @@ export function BookingForm({
             {ready ? "READY" : "STANDBY"}
           </span>
         </div>
-        <p className="min-h-[140px] font-mono text-base leading-[1.75] text-cyan" aria-live="polite">
+        <p key={readback} className="teletype min-h-[140px] font-mono text-base leading-[1.75] text-cyan" aria-live="polite">
           {readback}
         </p>
         <dl className="flex flex-col gap-2.5 border-t border-line pt-[18px] text-[15px]">

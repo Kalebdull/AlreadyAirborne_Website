@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ViewTransition } from "react";
 import { notFound } from "next/navigation";
 import { getViewer } from "@/lib/auth";
 import { getClip, getLibrary, getWatchedClipIds, signedUrl } from "@/lib/data";
@@ -42,6 +43,7 @@ export default async function ClipPage({ params }: PageProps<"/library/[id]">) {
         </nav>
 
         <div className="flex flex-wrap items-start gap-12">
+          <ViewTransition name={`clip-${clip.id}`} share="morph" default="none">
           <div className="mx-auto w-full max-w-[380px] shrink-0">
             {viewer ? (
               <ClipPlayer clipId={clip.id} src={video} poster={poster} watched={watched.has(clip.id)} />
@@ -58,6 +60,7 @@ export default async function ClipPage({ params }: PageProps<"/library/[id]">) {
               </div>
             )}
           </div>
+          </ViewTransition>
 
           <div className="flex min-w-0 flex-[1_1_480px] flex-col gap-7">
             <div className="flex flex-col gap-2.5">

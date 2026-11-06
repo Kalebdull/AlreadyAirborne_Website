@@ -3,12 +3,13 @@
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
-// Fades up any `.reveal` element as it scrolls into view.
+// Fades up `.reveal` elements (and the children of `.reveal-stagger`, one
+// after another) as they scroll into view.
 export function Reveal() {
   const pathname = usePathname();
 
   useEffect(() => {
-    const els = document.querySelectorAll<HTMLElement>(".reveal:not(.is-visible)");
+    const els = document.querySelectorAll<HTMLElement>(".reveal:not(.is-visible), .reveal-stagger:not(.is-visible)");
     const io = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {

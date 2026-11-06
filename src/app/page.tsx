@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { getLibrary } from "@/lib/data";
 import { site } from "@/lib/site";
+import { Pfd } from "@/components/pfd/pfd";
+import { RiseText } from "@/components/rise-text";
+import { Spotlight } from "@/components/spotlight";
 
 export default async function Home() {
   const { topics, clips } = await getLibrary();
@@ -22,7 +25,7 @@ export default async function Home() {
               <span className="text-dim">Free with an account.</span>
             </h2>
           </div>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+          <div className="reveal-stagger grid grid-cols-2 gap-4 md:grid-cols-3">
             {topics.length === 0 &&
               ["Airspace", "Weather", "Regulations", "Instrument 101", "Aerodynamics", "Navigation"].map((name) => (
                 <TopicTile key={name} href="/library" name={name} count={null} />
@@ -35,7 +38,7 @@ export default async function Home() {
       </section>
 
       <section className="px-6 pb-24 md:pb-32">
-        <div className="mx-auto grid max-w-[1024px] gap-10 border-t border-line pt-14 md:grid-cols-3">
+        <div className="reveal-stagger mx-auto grid max-w-[1024px] gap-10 border-t border-line pt-14 md:grid-cols-3">
           <Step n="01" tone="text-amber" tag="Request" title="Pick a time.">
             Choose a session or mock oral and an open slot. Tell me what you&apos;re stuck on.
           </Step>
@@ -63,19 +66,22 @@ export default async function Home() {
 
 function Hero() {
   return (
-    <section className="relative flex flex-col items-center gap-5 overflow-hidden px-6 pt-20 text-center md:pt-28">
-      <a href={site.instagram.url} className="font-mono text-[13px] tracking-[.14em] text-magenta hover:text-ink">
+    <section className="relative flex flex-col items-center gap-5 overflow-hidden px-4 pt-20 text-center sm:px-6 md:pt-28">
+      <a
+        href={site.instagram.url}
+        className="fade-up font-mono text-[13px] tracking-[.14em] text-magenta hover:text-ink"
+      >
         ● NOW ON INSTAGRAM · @{site.instagram.handle.toUpperCase()}
       </a>
       <h1 className="headline text-[56px] leading-[.98] md:text-[104px]">
-        Hard topics.
+        <RiseText text="Hard topics." delay={100} />
         <br />
-        Thirty seconds.
+        <RiseText text="Thirty seconds." delay={280} />
       </h1>
-      <p className="max-w-[640px] text-xl font-medium leading-snug text-mute md:text-2xl">
+      <p className="fade-up max-w-[640px] text-xl font-medium leading-snug text-mute md:text-2xl" style={{ animationDelay: "550ms" }}>
         Then go deeper, one-on-one, with a CFI who&apos;ll explain it until it clicks.
       </p>
-      <div className="mt-2 flex flex-wrap items-center justify-center gap-4">
+      <div className="fade-up mt-2 flex flex-wrap items-center justify-center gap-4" style={{ animationDelay: "700ms" }}>
         <Link href="/book" className="btn btn-primary">
           Book a session
         </Link>
@@ -84,61 +90,12 @@ function Hero() {
         </Link>
       </div>
 
-      <div className="relative mt-16 flex h-[600px] w-full max-w-[1180px] justify-center md:h-[720px]">
-        {/* The horizon: sky above, ground below, slightly banked. */}
-        <div aria-hidden className="absolute -inset-x-[10%] top-[46%] h-px -rotate-[4deg] bg-white/35" />
-        <div
-          aria-hidden
-          className="absolute -inset-x-[10%] top-[46%] -bottom-52 mt-px origin-top -rotate-[4deg] bg-[#0a0806]"
-        />
-
-        <div className="relative h-[580px] w-[282px] rounded-[50px] bg-raised p-[11px] shadow-[0_0_0_1px_#3a3a3c,0_40px_120px_rgba(0,0,0,.8)] md:h-[700px] md:w-[340px] md:rounded-[58px] md:p-3">
-          <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[40px] bg-card md:rounded-[46px]">
-            {site.heroReel ? (
-              <video
-                src={site.heroReel}
-                className="absolute inset-0 h-full w-full object-cover"
-                autoPlay
-                muted
-                loop
-                playsInline
-                aria-label="A 30-second AlreadyAirborne explainer"
-              />
-            ) : (
-              <span className="font-mono text-xs text-dim">[YOUR REEL · 9:16]</span>
-            )}
-            <div className="absolute left-1/2 top-3.5 h-8 w-[110px] -translate-x-1/2 rounded-[20px] bg-black" />
-            <div className="absolute inset-x-5 bottom-7 flex flex-col gap-2.5 text-left">
-              <span className="font-mono text-[11px] text-cyan">AIRSPACE · 0:30</span>
-              <span className="font-display text-[22px] font-semibold leading-tight">
-                The stuff the textbook makes complicated.
-              </span>
-              <div className="h-[3px] rounded bg-white/20">
-                <div className="h-full w-[62%] rounded bg-magenta" />
-              </div>
-            </div>
-          </div>
+      <div className="fade-up mt-14 flex w-full justify-center md:mt-20" style={{ animationDelay: "850ms" }}>
+        <div className="scroll-settle flex w-full justify-center">
+          <Pfd />
         </div>
-
-        <FloatChip className="left-[4%] top-[22%]" label="1-on-1 · Zoom">
-          $50<span className="text-[15px] font-medium text-mute"> / hour</span>
-        </FloatChip>
-        <FloatChip className="right-[4%] top-[58%]" label="Mock oral · PPL / CPL">
-          $175
-        </FloatChip>
       </div>
     </section>
-  );
-}
-
-function FloatChip({ className, label, children }: { className: string; label: string; children: React.ReactNode }) {
-  return (
-    <div
-      className={`absolute hidden flex-col gap-1.5 rounded-[18px] border border-white/10 bg-[#1c1c1e]/80 px-[18px] py-4 text-left backdrop-blur-xl md:flex ${className}`}
-    >
-      <span className="font-mono text-[11px] uppercase tracking-[.1em] text-dim">{label}</span>
-      <span className="font-display text-[28px] font-semibold">{children}</span>
-    </div>
   );
 }
 
@@ -152,7 +109,7 @@ function Offers() {
             Request a time. I confirm, send the Zoom link, and you pay after it&apos;s confirmed.
           </p>
         </div>
-        <div className="grid gap-5 md:grid-cols-2">
+        <div className="reveal-stagger grid gap-5 md:grid-cols-2">
           <OfferCard
             eyebrow="Session · Zoom"
             eyebrowClass="text-cyan"
@@ -207,9 +164,10 @@ function OfferCard(props: {
   highlight?: boolean;
 }) {
   return (
-    <article
+    <Spotlight
       id={props.id}
-      className={`card reveal flex scroll-mt-24 flex-col gap-7 p-8 md:p-11 ${props.highlight ? "shadow-[inset_0_0_0_1px_rgba(240,72,200,.45)]" : ""}`}
+      tint={props.highlight ? "240 72 200" : "34 211 238"}
+      className={`card flex scroll-mt-24 flex-col gap-7 p-8 md:p-11 ${props.highlight ? "shadow-[inset_0_0_0_1px_rgba(240,72,200,.45)]" : ""}`}
     >
       <div className="flex flex-col gap-2.5">
         <span className={`eyebrow ${props.eyebrowClass}`}>{props.eyebrow}</span>
@@ -230,7 +188,7 @@ function OfferCard(props: {
         ))}
       </ul>
       <div className="mt-auto">{props.cta}</div>
-    </article>
+    </Spotlight>
   );
 }
 
@@ -238,7 +196,7 @@ function TopicTile({ href, name, count }: { href: string; name: string; count: n
   return (
     <Link
       href={href}
-      className="reveal flex flex-col gap-10 rounded-3xl bg-card p-6 text-ink transition-transform duration-300 hover:-translate-y-1 md:p-7"
+      className="lift flex flex-col gap-10 rounded-3xl bg-card p-6 text-ink md:p-7"
     >
       <span className="font-mono text-xs text-cyan">
         {count === null ? "COMING SOON" : `${count} ${count === 1 ? "CLIP" : "CLIPS"}`}
@@ -250,7 +208,7 @@ function TopicTile({ href, name, count }: { href: string; name: string; count: n
 
 function Step(props: { n: string; tone: string; tag: string; title: string; children: React.ReactNode }) {
   return (
-    <div className="reveal flex flex-col gap-3">
+    <div className="flex flex-col gap-3">
       <span className={`font-mono text-[13px] uppercase ${props.tone}`}>
         {props.n} · {props.tag}
       </span>
