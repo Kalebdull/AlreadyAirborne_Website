@@ -1,0 +1,39 @@
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
+import { hasSupabase, SUPABASE_KEY, SUPABASE_URL } from "@/lib/supabase/env";
+
+// Refreshes the Supabase session once per navigation so pages and actions
+// see a valid token. Authorization itself happens next to the data.
+export async function proxy(request: NextRequest) {
+  let response = NextResponse.next({ request });
+  if (!hasSupabase) return response;
+
+  const supabase = createServerClient(SUPABASE_URL, SUPABASE_KEY, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet, headers) {
+        for (const { name, value } of cookiesToSet) {
+          request.cookies.set(name, value);
+        }
+        response = NextResponse.next({ request });
+        for (const { name, value, options } of cookiesToSet) {
+          response.cookies.set(name, value, options);
+        }
+        for (const [key, value] of Object.entries(headers ?? {})) {
+          response.headers.set(key, value);
+        }
+      },
+    },
+  });
+
+  await supabase.auth.getClaims();
+  return response;
+}
+
+export const config = {
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4)$).*)",
+  ],
+};

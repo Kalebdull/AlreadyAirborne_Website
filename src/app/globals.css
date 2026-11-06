@@ -1,26 +1,205 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * AlreadyAirborne design system: Apple Pro x Glass Cockpit.
+ * Color is rare and always means what it means on a glass panel:
+ * cyan = selectable, magenta = active, green = cleared,
+ * amber = pending, red = unable.
+ */
+@theme {
+  --color-page: #000000;
+  --color-card: #111214;
+  --color-raised: #1d1d1f;
+  --color-line: #2c2c2e;
+  --color-edge: #3a3a3c;
+  --color-ink: #f5f5f7;
+  --color-soft: #d2d2d7;
+  --color-mute: #a1a1a6;
+  --color-dim: #86868b;
+
+  --color-cyan: #22d3ee;
+  --color-cyan-hover: #67e8f9;
+  --color-magenta: #f048c8;
+  --color-green: #4ade80;
+  --color-amber: #fbbf24;
+  --color-red: #f87171;
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-inter-tight), var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+
+  --radius-card: 28px;
+  --radius-tile: 20px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--color-page);
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-cyan);
+  color: #000;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-cyan);
+  outline-offset: 3px;
+}
+
+@layer components {
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-dim);
+  }
+
+  .headline {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 980px;
+    padding: 13px 24px;
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 1.2;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+    cursor: pointer;
+  }
+  .btn:disabled {
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: var(--color-cyan);
+    color: #000;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-cyan-hover);
+  }
+  .btn-primary:disabled {
+    background: var(--color-raised);
+    color: var(--color-dim);
+  }
+
+  .btn-ghost {
+    border: 1px solid var(--color-edge);
+    color: var(--color-ink);
+    padding: 12px 23px;
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--color-raised);
+  }
+
+  .btn-sm {
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+  .btn-ghost.btn-sm {
+    padding: 7px 15px;
+  }
+
+  .link {
+    color: var(--color-cyan);
+  }
+  .link:hover {
+    color: #a5f3fc;
+  }
+
+  .card {
+    background: var(--color-card);
+    border-radius: var(--radius-card);
+  }
+
+  .field {
+    width: 100%;
+    background: var(--color-card);
+    color: var(--color-ink);
+    border: 1px solid var(--color-line);
+    border-radius: 14px;
+    padding: 13px 16px;
+    font-size: 17px;
+    font-family: var(--font-sans);
+    letter-spacing: normal;
+    text-transform: none;
+  }
+  .field:focus {
+    outline: none;
+    border-color: var(--color-cyan);
+    box-shadow: 0 0 0 3px rgb(34 211 238 / 0.25);
+  }
+  .field::placeholder {
+    color: var(--color-dim);
+  }
+
+  .label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-dim);
+  }
+
+  /* Selectable option tile: the cyan "knob cursor" when chosen. */
+  .option {
+    border: 1px solid transparent;
+    background: var(--color-card);
+    color: var(--color-ink);
+    border-radius: 18px;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s, background-color 0.15s;
+  }
+  .option:hover:not(:disabled) {
+    border-color: var(--color-cyan);
+  }
+  .option[aria-pressed="true"] {
+    background: #0b1e24;
+    border-color: var(--color-cyan);
+    box-shadow: 0 0 0 3px rgb(34 211 238 / 0.25);
+  }
+  .option:disabled {
+    background: #0a0a0b;
+    color: #48484a;
+    cursor: not-allowed;
+  }
+}
+
+/* Scroll reveal: elements fade up once they enter the viewport. */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.8s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
