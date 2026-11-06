@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AlreadyAirborne — Request clearance</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#000000}
+a{color:#22D3EE;text-decoration:none}a:hover{color:#A5F3FC}
+.pick:hover{border-color:#22D3EE !important}
+.pick:disabled:hover{border-color:transparent !important}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 100vh; background: #000000; color: #F5F5F7; font-family: Inter, sans-serif; display: flex; flex-direction: column">
+
+<header style="height: 52px; display: flex; align-items: center; justify-content: center; padding: 0 22px; background: rgba(22,22,23,.72); border-bottom: 1px solid rgba(255,255,255,.08)">
+<div style="width: 100%; max-width: 1180px; display: flex; align-items: center; gap: 12px; font-size: 13px">
+<a href="#" style="color: #A1A1A6">‹ Home</a>
+<span style="margin-left: auto; font-family: 'JetBrains Mono'; font-size: 12px; color: #86868B">CLNC · REQUEST</span>
+</div>
+</header>
+
+<main style="flex: 1; padding: 56px 24px; display: flex; justify-content: center">
+<div style="width: 100%; max-width: 1180px; display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start">
+
+<div style="flex: 999 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 44px">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<h1 style="margin: 0; font-family: 'Inter Tight'; font-weight: 700; font-size: 64px; line-height: 1; letter-spacing: -.035em">Request clearance.</h1>
+<p style="margin: 0; font-size: 19px; color: #A1A1A6">Pick what you need and when. Nothing to pay until I confirm.</p>
+</div>
+
+<fieldset style="border: 0; margin: 0; padding: 0">
+<legend style="font-family: 'JetBrains Mono'; font-size: 12px; color: #86868B; letter-spacing: .12em; padding: 0; margin-bottom: 16px">1 · SERVICE</legend>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px">
+<sc-for list="{{services}}" as="t" hint-placeholder-count="3">
+<button class="pick" type="button" onClick="{{t.pick}}" style="{{t.style}}">
+<span style="display: block; font-family: 'JetBrains Mono'; font-size: 11px; letter-spacing: .1em; color: {{t.eyeColor}}">{{t.eyebrow}}</span>
+<span style="display: block; font-family: 'Inter Tight'; font-weight: 600; font-size: 22px; margin-top: 10px">{{t.label}}</span>
+<span style="display: block; font-size: 15px; color: #A1A1A6; margin-top: 4px">{{t.price}}</span>
+</button>
+</sc-for>
+</div>
+</fieldset>
+
+<sc-if value="{{isZoom}}" hint-placeholder-val="{{ true }}">
+<fieldset style="border: 0; margin: 0; padding: 0">
+<legend style="font-family: 'JetBrains Mono'; font-size: 12px; color: #86868B; letter-spacing: .12em; padding: 0; margin-bottom: 16px">2 · LENGTH</legend>
+<div style="display: flex; gap: 8px; flex-wrap: wrap">
+<sc-for list="{{lengths}}" as="l" hint-placeholder-count="3">
+<button class="pick" type="button" onClick="{{l.pick}}" style="{{l.style}}">{{l.label}}</button>
+</sc-for>
+</div>
+</fieldset>
+</sc-if>
+
+<fieldset style="border: 0; margin: 0; padding: 0">
+<legend style="font-family: 'JetBrains Mono'; font-size: 12px; color: #86868B; letter-spacing: .12em; padding: 0; margin-bottom: 16px">{{dayStep}} · DAY</legend>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 8px">
+<sc-for list="{{days}}" as="d" hint-placeholder-count="7">
+<button class="pick" type="button" onClick="{{d.pick}}" style="{{d.style}}">
+<span style="display: block; font-family: 'JetBrains Mono'; font-size: 11px; color: #86868B">{{d.dow}}</span>
+<span style="display: block; font-family: 'Inter Tight'; font-size: 26px; font-weight: 600; margin-top: 4px">{{d.num}}</span>
+</button>
+</sc-for>
+</div>
+</fieldset>
+
+<fieldset style="border: 0; margin: 0; padding: 0">
+<legend style="font-family: 'JetBrains Mono'; font-size: 12px; color: #86868B; letter-spacing: .12em; padding: 0; margin-bottom: 16px">{{timeStep}} · START TIME (YOUR TIME ZONE)</legend>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px">
+<sc-for list="{{slots}}" as="s" hint-placeholder-count="6">
+<button class="pick" type="button" onClick="{{s.pick}}" disabled="{{s.taken}}" style="{{s.style}}">{{s.label}}</button>
+</sc-for>
+</div>
+</fieldset>
+
+<label style="display: flex; flex-direction: column; gap: 12px; font-family: 'JetBrains Mono'; font-size: 12px; color: #86868B; letter-spacing: .12em">WHAT ARE YOU STUCK ON? (OPTIONAL)
+<textarea rows="3" placeholder="e.g. Class B vs C entry, reading a METAR, holding entries…" style="font-family: Inter, sans-serif; font-size: 17px; letter-spacing: 0; background: #111214; color: #F5F5F7; border: 1px solid #2C2C2E; border-radius: 16px; padding: 16px; resize: vertical"></textarea>
+</label>
+</div>
+
+<aside style="flex: 1 1 360px; position: sticky; top: 24px; background: #111214; border-radius: 28px; padding: 32px; display: flex; flex-direction: column; gap: 22px">
+<div style="display: flex; justify-content: space-between; align-items: center">
+<span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #86868B; letter-spacing: .12em">READBACK</span>
+<span style="{{statusStyle}}">{{statusLabel}}</span>
+</div>
+<p style="margin: 0; font-family: 'JetBrains Mono'; font-size: 16px; line-height: 1.75; color: #22D3EE; min-height: 140px">{{readback}}</p>
+<div style="display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #2C2C2E; padding-top: 18px; font-size: 15px">
+<div style="display: flex; justify-content: space-between"><span style="color: #A1A1A6">Service</span><span>{{serviceLabel}}</span></div>
+<div style="display: flex; justify-content: space-between"><span style="color: #A1A1A6">When</span><span>{{whenLabel}}</span></div>
+<div style="display: flex; justify-content: space-between"><span style="color: #A1A1A6">Where</span><span>Zoom</span></div>
+<div style="display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid #2C2C2E; padding-top: 14px; margin-top: 4px"><span style="color: #A1A1A6">Total, due after confirmation</span><span style="font-family: 'Inter Tight'; font-weight: 700; font-size: 32px">{{total}}</span></div>
+</div>
+<button type="button" onClick="{{submit}}" disabled="{{cantSubmit}}" style="{{submitStyle}}">{{submitLabel}}</button>
+<span style="font-size: 13px; color: #86868B; line-height: 1.5">You'll get an email when it's confirmed, with the Zoom link and payment details.</span>
+</aside>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1120}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { svc: null, hours: 1, day: null, slot: null, sent: false };
+  }
+  renderVals() {
+    var s = this.state;
+    var self = this;
+    var card = "text-align: left; cursor: pointer; padding: 22px; border-radius: 20px; font-family: inherit; color: #F5F5F7; ";
+    var off = "background: #111214; border: 1px solid transparent; ";
+    var on = "background: #0B1E24; border: 1px solid #22D3EE; box-shadow: 0 0 0 3px rgba(34,211,238,.25); ";
+    var svcData = [
+      { id: "zoom", eyebrow: "SESSION · ZOOM", label: "1-on-1 Tutoring", price: "$50 / hour", eyeColor: "#22D3EE", short: "1-ON-1 ZOOM SESSION", flat: 0 },
+      { id: "ppl", eyebrow: "MOCK ORAL", label: "Private Pilot", price: "$175", eyeColor: "#F048C8", short: "PRIVATE PILOT MOCK ORAL", flat: 175 },
+      { id: "cpl", eyebrow: "MOCK ORAL", label: "Commercial", price: "$175", eyeColor: "#F048C8", short: "COMMERCIAL MOCK ORAL", flat: 175 }
+    ];
+    var dayData = [
+      { id: 0, dow: "MON", num: "9" }, { id: 1, dow: "TUE", num: "10" }, { id: 2, dow: "WED", num: "11" },
+      { id: 3, dow: "THU", num: "12" }, { id: 4, dow: "FRI", num: "13" }, { id: 5, dow: "SAT", num: "14" }, { id: 6, dow: "SUN", num: "15" }
+    ];
+    var times = ["9:00 AM", "11:00 AM", "1:00 PM", "3:00 PM", "6:00 PM", "8:00 PM"];
+    var takenMap = { 0: ["11:00 AM"], 1: ["9:00 AM", "6:00 PM"], 2: [], 3: ["1:00 PM"], 4: ["8:00 PM", "11:00 AM"], 5: ["9:00 AM"], 6: ["1:00 PM", "3:00 PM"] };
+    var services = svcData.map(function (t) {
+      return Object.assign({}, t, {
+        style: card + (s.svc === t.id ? on : off),
+        pick: function () { self.setState({ svc: t.id, sent: false }); }
+      });
+    });
+    var lengths = [1, 1.5, 2].map(function (h) {
+      return {
+        label: (h === 1 ? "1 hour" : h + " hours") + " · $" + (50 * h),
+        style: card + "padding: 14px 20px; border-radius: 980px; font-size: 15px; " + (s.hours === h ? on : off),
+        pick: function () { self.setState({ hours: h, sent: false }); }
+      };
+    });
+    var days = dayData.map(function (d) {
+      return Object.assign({}, d, {
+        style: card + "text-align: center; padding: 14px 8px; border-radius: 16px; " + (s.day === d.id ? on : off),
+        pick: function () { self.setState({ day: d.id, slot: null, sent: false }); }
+      });
+    });
+    var takenToday = s.day === null ? [] : takenMap[s.day];
+    var slotBase = "font-family: 'JetBrains Mono', monospace; font-size: 15px; text-align: center; padding: 14px 8px; border-radius: 14px; ";
+    var slots = times.map(function (t) {
+      var taken = s.day === null || takenToday.indexOf(t) !== -1;
+      return {
+        label: t,
+        taken: taken,
+        style: taken
+          ? slotBase + "background: #0A0A0B; color: #48484A; border: 1px solid transparent; cursor: not-allowed;" + (s.day !== null ? " text-decoration: line-through;" : "")
+          : slotBase + "cursor: pointer; color: #F5F5F7; " + (s.slot === t ? on : off),
+        pick: function () { self.setState({ slot: t, sent: false }); }
+      };
+    });
+    var svc = svcData.filter(function (t) { return t.id === s.svc; })[0];
+    var day = dayData.filter(function (d) { return d.id === s.day; })[0];
+    var isZoom = s.svc === "zoom";
+    var ready = !!(svc && day && s.slot);
+    var price = svc ? (isZoom ? 50 * s.hours : svc.flat) : null;
+    var missing = [!svc ? "SERVICE" : null, !day ? "DAY" : null, !s.slot ? "TIME" : null].filter(Boolean).join(", ");
+    var readback = ready
+      ? "[STUDENT], CLEARED AS REQUESTED: " + svc.short + (isZoom ? ", " + s.hours + " HR" : "") + ", " + day.dow + " " + day.num + " NOV AT " + s.slot.toUpperCase() + ". ZOOM LINK TO FOLLOW ON CONFIRMATION."
+      : "STANDING BY. SELECT " + missing + ".";
+    var chip = "font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: .08em; padding: 5px 10px; border-radius: 980px;";
+    var pill = "font-family: Inter, sans-serif; font-size: 17px; font-weight: 500; border-radius: 980px; padding: 16px; border: 0;";
+    return {
+      services: services, lengths: lengths, days: days, slots: slots, isZoom: isZoom,
+      dayStep: isZoom ? "3" : "2", timeStep: isZoom ? "4" : "3",
+      readback: readback,
+      serviceLabel: svc ? svc.label + (isZoom ? " · " + s.hours + " hr" : "") : "—",
+      whenLabel: ready ? day.dow.charAt(0) + day.dow.slice(1).toLowerCase() + " Nov " + day.num + ", " + s.slot : "—",
+      total: price === null ? "—" : "$" + price,
+      statusLabel: s.sent ? "PENDING" : (ready ? "READY" : "STANDBY"),
+      statusStyle: s.sent ? chip + " background: #FBBF24; color: #3B2601;" : (ready ? chip + " background: rgba(34,211,238,.15); color: #22D3EE;" : chip + " background: #1D1D1F; color: #86868B;"),
+      cantSubmit: !ready || s.sent,
+      submitLabel: s.sent ? "Request sent · awaiting confirmation" : "Request clearance",
+      submitStyle: ready && !s.sent ? pill + " background: #22D3EE; color: #000000; cursor: pointer;" : pill + " background: #1D1D1F; color: #86868B; cursor: not-allowed;",
+      submit: function () { if (ready) self.setState({ sent: true }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

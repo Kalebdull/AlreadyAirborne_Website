@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AlreadyAirborne — Clip player</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#000000}
+a{color:#22D3EE;text-decoration:none}a:hover{color:#A5F3FC}
+.row:hover{background:#1D1D1F}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 100vh; background: #000000; color: #F5F5F7; font-family: Inter, sans-serif; display: flex; flex-direction: column">
+
+<header style="height: 52px; display: flex; align-items: center; justify-content: center; padding: 0 22px; background: rgba(22,22,23,.72); border-bottom: 1px solid rgba(255,255,255,.08)">
+<div style="width: 100%; max-width: 1180px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: #A1A1A6">
+<a href="#" style="color: #A1A1A6">‹ Library</a><span>/</span><span style="color: #F5F5F7">Weather</span>
+</div>
+</header>
+
+<main style="flex: 1; padding: 48px 24px 80px; display: flex; justify-content: center">
+<div style="width: 100%; max-width: 1180px; display: flex; flex-wrap: wrap; gap: 48px; align-items: flex-start">
+
+<div style="flex: 0 0 auto; margin: 0 auto; width: 380px; max-width: 100%; aspect-ratio: 9 / 16; border-radius: 32px; background: #111214; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 1px #2C2C2E">
+<span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #86868B">[VERTICAL CLIP PLAYER]</span>
+<div style="position: absolute; left: 20px; right: 20px; bottom: 20px; display: flex; align-items: center; gap: 10px; font-family: 'JetBrains Mono'; font-size: 11px">
+<span>0:12</span>
+<div style="flex: 1; height: 3px; background: rgba(255,255,255,.2); border-radius: 2px"><div style="width: 40%; height: 100%; background: #F048C8; border-radius: 2px"></div></div>
+<span>0:30</span>
+</div>
+</div>
+
+<div style="flex: 1 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 28px">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #F048C8; letter-spacing: .12em">➔ WEATHER · CLIP 4 OF [#]</span>
+<h1 style="margin: 0; font-family: 'Inter Tight'; font-weight: 700; font-size: 52px; line-height: 1.02; letter-spacing: -.035em">[Clip title]</h1>
+<p style="margin: 0; font-size: 18px; line-height: 1.55; color: #A1A1A6">[One- or two-line summary of the clip, the takeaway in plain words.]</p>
+</div>
+<div style="display: flex; gap: 12px; flex-wrap: wrap">
+<button type="button" style="font-family: Inter, sans-serif; font-size: 16px; font-weight: 500; color: #4ADE80; background: rgba(74,222,128,.12); border: 0; padding: 13px 22px; border-radius: 980px">✓ Mark as watched</button>
+<a href="#" style="font-size: 16px; font-weight: 500; background: #22D3EE; color: #000000; padding: 13px 22px; border-radius: 980px">Next clip ›</a>
+</div>
+
+<div style="background: #111214; border-radius: 24px; overflow: hidden">
+<div style="padding: 18px 22px; display: flex; justify-content: space-between; font-family: 'JetBrains Mono'; font-size: 12px; color: #86868B; letter-spacing: .1em"><span>WEATHER</span><span>3 / [#] WATCHED</span></div>
+<a class="row" href="#" style="display: grid; grid-template-columns: 24px 1fr auto; gap: 14px; padding: 14px 22px; align-items: center; color: #A1A1A6; border-top: 1px solid #2C2C2E"><span style="color: #4ADE80; font-family: 'JetBrains Mono'">✓</span><span>[Clip title]</span><span style="font-family: 'JetBrains Mono'; font-size: 12px">0:30</span></a>
+<a class="row" href="#" style="display: grid; grid-template-columns: 24px 1fr auto; gap: 14px; padding: 14px 22px; align-items: center; color: #A1A1A6; border-top: 1px solid #2C2C2E"><span style="color: #4ADE80; font-family: 'JetBrains Mono'">✓</span><span>[Clip title]</span><span style="font-family: 'JetBrains Mono'; font-size: 12px">0:30</span></a>
+<a class="row" href="#" style="display: grid; grid-template-columns: 24px 1fr auto; gap: 14px; padding: 14px 22px; align-items: center; color: #F048C8; border-top: 1px solid #2C2C2E; background: rgba(240,72,200,.08)"><span style="font-family: 'JetBrains Mono'">➔</span><span>[Clip title]</span><span style="font-family: 'JetBrains Mono'; font-size: 12px">0:30</span></a>
+<a class="row" href="#" style="display: grid; grid-template-columns: 24px 1fr auto; gap: 14px; padding: 14px 22px; align-items: center; color: #F5F5F7; border-top: 1px solid #2C2C2E"><span></span><span>[Clip title]</span><span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #86868B">0:30</span></a>
+</div>
+
+<div style="border-radius: 24px; padding: 26px 28px; box-shadow: inset 0 0 0 1px rgba(34,211,238,.4); display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: 'Inter Tight'; font-weight: 600; font-size: 22px">Still fuzzy on this one?</span>
+<span style="font-size: 15px; color: #A1A1A6">Book an hour and we'll work through it together. $50.</span>
+</div>
+<a href="#" style="font-size: 16px; font-weight: 500; background: #22D3EE; color: #000000; padding: 12px 20px; border-radius: 980px">Book 1-on-1</a>
+</div>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
