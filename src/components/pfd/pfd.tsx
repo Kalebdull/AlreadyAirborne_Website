@@ -3,16 +3,18 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { LogoMark } from "@/components/logo";
-import { createFlight, readouts, step, type FlightState } from "./flight-model";
+import { createFlight, modeLabel, readouts, step, type FlightState } from "./flight-model";
+import type { SvtScene } from "./scene";
+import { GATES } from "./world";
 
-// A working Garmin-style primary flight display. It takes off on load,
-// flies itself (autopilot) and hands over the controls when you move the
-// mouse (or drag sideways on a phone). Everything is driven from one
-// requestAnimationFrame loop that writes transforms directly to the DOM.
-
-// The sim runs faster than real time so a visitor sees the takeoff and
-// climb in a few seconds rather than a few minutes.
-const SIM_SPEED = 2.5;
+// A working Garmin-style primary flight display with synthetic vision.
+// It takes off on load and the autopilot flies the magenta pathway around
+// the traffic pattern to a landing. Hover the display (or drag on a phone)
+// to take the controls; let go and the autopilot takes them back.
+//
+// One requestAnimationFrame loop drives everything: the flight model, the
+// 3D scene (loaded on demand) and the 2D instruments, which are written as
+// transforms straight to the DOM so React never re-renders mid-flight.
 
 const PPK = 4; // speed tape: px per knot
 const PPF = 0.4; // altitude tape: px per foot
@@ -27,6 +29,7 @@ const INITIAL = createFlight();
 
 const PITCH_LINES = Array.from({ length: 25 }, (_, i) => (i - 12) * 2.5).filter((d) => d !== 0);
 const ROLL_TICKS = [-60, -45, -30, -20, -10, 0, 10, 20, 30, 45, 60];
+const MANUAL_TIMEOUT = 2500; // ms without input before the autopilot takes back over
 
 function headingLabel(deg: number) {
   const h = ((deg % 360) + 360) % 360;
@@ -41,6 +44,7 @@ export function Pfd() {
     if (!el) return;
     const q = <T extends HTMLElement | SVGElement>(name: string) => el.querySelector<T>(`[data-pfd="${name}"]`)!;
     const parts = {
+      svt: q<HTMLDivElement>("svt"),
       attitude: q<HTMLDivElement>("attitude"),
       rollPointer: q<HTMLDivElement>("roll-pointer"),
       fpm: q<HTMLDivElement>("fpm"),
@@ -59,17 +63,25 @@ export function Pfd() {
       hdgBug: q<HTMLDivElement>("hdg-bug"),
       mode: q<HTMLSpanElement>("mode"),
       gs: q<HTMLSpanElement>("gs"),
+      gates: q<HTMLSpanElement>("gates"),
       utc: q<HTMLSpanElement>("utc"),
       warning: q<HTMLDivElement>("warning"),
+      toast: q<HTMLDivElement>("toast"),
+      fade: q<HTMLDivElement>("fade"),
     };
+    const fallback = el.querySelectorAll<HTMLElement>('[data-pfd="fallback"]');
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const flight: FlightState = createFlight(reduced);
     const pointer = { x: 0, y: 0, at: -Infinity };
+    let svt: SvtScene | null = null;
+    let disposed = false;
     let visible = true;
     let raf = 0;
     let last = performance.now();
     let lastText = "";
+    let lastSecond = -1;
+    let resizeObserver: ResizeObserver | null = null;
 
     function render(s: FlightState) {
       const r = readouts(s);
@@ -83,13 +95,17 @@ export function Pfd() {
       parts.speedTrend.style.transform = r.speedTrend < 0 ? "scaleY(-1)" : "";
       parts.altTrend.style.height = `${Math.min(Math.abs(r.altTrend) * PPF, 140)}px`;
       parts.altTrend.style.transform = r.altTrend < 0 ? "scaleY(-1)" : "";
-      parts.altBug.style.transform = `translateY(${(s.alt - s.altSel) * PPF}px)`;
+      parts.altBug.style.transform = `translateY(${Math.max(-400, Math.min(400, (s.alt - s.altSel) * PPF))}px)`;
       parts.vsiMarker.style.transform = `translateY(${Math.max(-1, Math.min(1, -s.vs / 2000)) * 46}%)`;
       const hdgDiff = ((s.hdgSel - s.hdg + 540) % 360) - 180;
       parts.hdgBug.style.transform = `translateX(${hdgDiff * PPH}px)`;
+      parts.fade.style.opacity = String(s.fade);
+
+      svt?.update(s, r);
 
       // Text only changes a few times a second; skip DOM writes when equal.
-      const text = `${r.iasText}|${r.altText}|${r.hdgText}|${r.vsText}|${s.mode}|${s.altSel}|${r.warning}`;
+      const showToast = s.toast && s.time - s.toast.at < (s.toast.tone === "green" && s.toast.text.startsWith("GATE") ? 1.4 : 3.2);
+      const text = `${r.iasText}|${r.altText}|${r.hdgText}|${r.vsText}|${s.phase}|${s.altSel}|${r.warning}|${r.gatesText}|${showToast ? s.toast!.at : ""}`;
       if (text !== lastText) {
         lastText = text;
         parts.speedText.textContent = r.iasText;
@@ -98,83 +114,123 @@ export function Pfd() {
         parts.hdgText.textContent = `${r.hdgText}°`;
         parts.vsiText.textContent = r.vsText;
         parts.altSel.textContent = String(s.altSel);
-        parts.mode.textContent = s.mode === "takeoff" ? "TO/GA" : s.mode === "ap" ? "AP · ALT · HDG" : "YOUR AIRPLANE";
-        parts.mode.dataset.mode = s.mode;
+        parts.gates.textContent = r.gatesText;
+        parts.mode.textContent = modeLabel(s.phase);
+        parts.mode.dataset.mode = s.phase;
         parts.warning.dataset.on = r.warning ? "true" : "false";
+        if (showToast) {
+          parts.toast.textContent = s.toast!.text;
+          parts.toast.dataset.tone = s.toast!.tone;
+        }
+        parts.toast.dataset.on = showToast ? "true" : "false";
       }
       const now = new Date();
-      parts.utc.textContent = `${String(now.getUTCHours()).padStart(2, "0")}:${String(now.getUTCMinutes()).padStart(2, "0")}:${String(now.getUTCSeconds()).padStart(2, "0")}Z`;
+      if (now.getUTCSeconds() !== lastSecond) {
+        lastSecond = now.getUTCSeconds();
+        parts.utc.textContent = `${String(now.getUTCHours()).padStart(2, "0")}:${String(now.getUTCMinutes()).padStart(2, "0")}:${String(lastSecond).padStart(2, "0")}Z`;
+      }
+    }
+
+    // The stick is the pointer's position over the attitude display.
+    function stick() {
+      if (performance.now() - pointer.at > MANUAL_TIMEOUT) return null;
+      const rect = parts.svt.getBoundingClientRect();
+      return {
+        x: Math.max(-1, Math.min(1, (pointer.x - (rect.left + rect.width / 2)) / (rect.width / 2))),
+        y: Math.max(-1, Math.min(1, (pointer.y - (rect.top + rect.height / 2)) / (rect.height / 2))),
+      };
     }
 
     function frame(t: number) {
-      const dt = Math.min(0.05, (t - last) / 1000);
+      // Clamp long gaps (tab switches, slow frames) so nothing ever jumps.
+      const dt = Math.min(0.05, Math.max(0, (t - last) / 1000));
       last = t;
-      const rect = el!.getBoundingClientRect();
-      const manual = t - pointer.at < 2500;
-      step(flight, dt * SIM_SPEED, {
-        t: t / 1000,
-        // Stick position: pointer relative to the display's center, -1..1.
-        stick: manual
-          ? {
-              x: Math.max(-1, Math.min(1, (pointer.x - (rect.left + rect.width / 2)) / (rect.width / 2))),
-              y: Math.max(-1, Math.min(1, (pointer.y - (rect.top + rect.height / 2)) / (rect.height / 2))),
-            }
-          : null,
-        scroll: window.scrollY,
-      });
+      step(flight, dt, { stick: stick() });
       render(flight);
-      if (visible) raf = requestAnimationFrame(frame);
+      if (visible && !disposed) raf = requestAnimationFrame(frame);
     }
 
+    function start() {
+      if (reduced || disposed) return;
+      cancelAnimationFrame(raf);
+      last = performance.now();
+      raf = requestAnimationFrame(frame);
+    }
+
+    // Synthetic vision loads after the page is showing; until then (or if
+    // WebGL isn't available) the classic blue-over-brown display is shown.
+    import("./scene")
+      .then(({ createScene }) => {
+        if (disposed) return;
+        try {
+          svt = createScene(parts.svt);
+        } catch {
+          return;
+        }
+        const canvas = parts.svt.querySelector("canvas");
+        canvas?.addEventListener("webglcontextlost", () => {
+          parts.svt.dataset.ready = "false";
+          fallback.forEach((f) => (f.style.opacity = "1"));
+        });
+        resizeObserver = new ResizeObserver(() => svt?.resize(parts.svt.clientWidth, parts.svt.clientHeight));
+        resizeObserver.observe(parts.svt);
+        svt.resize(parts.svt.clientWidth, parts.svt.clientHeight);
+        render(flight);
+        requestAnimationFrame(() => {
+          parts.svt.dataset.ready = "true";
+          fallback.forEach((f) => (f.style.opacity = "0"));
+        });
+      })
+      .catch(() => {});
+
     render(flight);
-    if (reduced) return;
 
     const onPointer = (e: PointerEvent) => {
-      if (e.pointerType === "mouse") {
-        pointer.x = e.clientX;
-        pointer.y = e.clientY;
-        pointer.at = performance.now();
-      }
+      if (e.pointerType !== "mouse") return;
+      const rect = parts.svt.getBoundingClientRect();
+      const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+      if (!inside) return;
+      pointer.x = e.clientX;
+      pointer.y = e.clientY;
+      pointer.at = performance.now();
     };
     // On touch: drag sideways across the display to bank. Vertical drags
     // still scroll the page (touch-action: pan-y on the element).
     const onTouch = (e: PointerEvent) => {
-      if (e.pointerType !== "mouse" && e.buttons) {
-        pointer.x = e.clientX;
-        const rect = el.getBoundingClientRect();
-        pointer.y = rect.top + rect.height / 2;
-        pointer.at = performance.now();
-      }
+      if (e.pointerType === "mouse" || !e.buttons) return;
+      const rect = parts.svt.getBoundingClientRect();
+      pointer.x = e.clientX;
+      pointer.y = rect.top + rect.height / 2;
+      pointer.at = performance.now();
     };
     window.addEventListener("pointermove", onPointer, { passive: true });
     el.addEventListener("pointermove", onTouch, { passive: true });
 
+    // Pause when scrolled away or the tab is hidden.
     const io = new IntersectionObserver(([entry]) => {
       const was = visible;
       visible = entry.isIntersecting && document.visibilityState === "visible";
-      if (visible && !was) {
-        last = performance.now();
-        raf = requestAnimationFrame(frame);
-      }
+      if (visible && !was) start();
     });
     io.observe(el);
     const onVisibility = () => {
       const was = visible;
-      visible = document.visibilityState === "visible" && el.getBoundingClientRect().bottom > 0;
-      if (visible && !was) {
-        last = performance.now();
-        raf = requestAnimationFrame(frame);
-      }
+      const rect = el.getBoundingClientRect();
+      visible = document.visibilityState === "visible" && rect.bottom > 0 && rect.top < window.innerHeight;
+      if (visible && !was) start();
     };
     document.addEventListener("visibilitychange", onVisibility);
 
-    raf = requestAnimationFrame(frame);
+    start();
     return () => {
+      disposed = true;
       cancelAnimationFrame(raf);
       io.disconnect();
+      resizeObserver?.disconnect();
       window.removeEventListener("pointermove", onPointer);
       el.removeEventListener("pointermove", onTouch);
       document.removeEventListener("visibilitychange", onVisibility);
+      svt?.dispose();
     };
   }, []);
 
@@ -185,7 +241,7 @@ export function Pfd() {
         className="relative overflow-hidden rounded-[30px] bg-[#1d1d1f] p-2 shadow-[0_0_0_1px_#3a3a3c,0_50px_140px_rgba(0,0,0,.85)] md:rounded-[36px] md:p-2.5"
         style={{ touchAction: "pan-y" }}
         role="img"
-        aria-label="A working primary flight display. Move your mouse over the page to fly it."
+        aria-label="A working primary flight display with synthetic vision. Hover over it to fly the airplane through the gates and land."
       >
         <div className="flex flex-col overflow-hidden rounded-[22px] bg-black md:rounded-[27px]">
           {/* Top strip */}
@@ -197,13 +253,13 @@ export function Pfd() {
             <span className="hidden md:inline">
               GS <span data-pfd="gs" className="text-ink">0</span>KT
             </span>
-            <span className="hidden md:inline">
-              ETE <span className="text-magenta">00:30</span>
+            <span>
+              GATES <span data-pfd="gates" className="text-magenta">0/{GATES.length}</span>
             </span>
             <span
               data-pfd="mode"
               data-mode="takeoff"
-              className="mx-auto rounded-md px-2 py-0.5 font-bold text-green data-[mode=manual]:bg-cyan/15 data-[mode=manual]:text-cyan"
+              className="mx-auto rounded-md px-2 py-0.5 font-bold text-green transition-colors data-[mode=crashed]:bg-red/15 data-[mode=crashed]:text-red data-[mode=manual]:bg-cyan/15 data-[mode=manual]:text-cyan"
             >
               TO/GA
             </span>
@@ -214,11 +270,13 @@ export function Pfd() {
 
           {/* Attitude + tapes */}
           <div className="relative aspect-[4/5] sm:aspect-[16/10] md:aspect-[16/9]">
-            <div className="absolute inset-0 overflow-hidden [container-type:size]" style={{ ["--ppd" as string]: "2.6cqh" }}>
+            <div className="absolute inset-0 overflow-hidden bg-[#3d86e6] [container-type:size]" style={{ ["--ppd" as string]: "2.6cqh" }}>
+              {/* Synthetic vision (3D), fades in once loaded */}
+              <div data-pfd="svt" data-ready="false" className="absolute inset-0 opacity-0 transition-opacity duration-700 data-[ready=true]:opacity-100" />
               {/* Sky / ground / pitch ladder: rotates with roll, slides with pitch */}
               <div data-pfd="attitude" className="absolute inset-0 will-change-transform">
-                <div className="absolute -inset-x-[150%] -top-[150%] bottom-1/2 bg-[linear-gradient(to_bottom,#0b3a86_0%,#1f63c4_70%,#3d86e6_100%)]" />
-                <div className="absolute -inset-x-[150%] -bottom-[150%] top-1/2 bg-[linear-gradient(to_bottom,#7a4a22_0%,#5b3518_30%,#3b220f_100%)]" />
+                <div data-pfd="fallback" className="absolute -inset-x-[150%] -top-[150%] bottom-1/2 bg-[linear-gradient(to_bottom,#0b3a86_0%,#1f63c4_70%,#3d86e6_100%)] transition-opacity duration-700" />
+                <div data-pfd="fallback" className="absolute -inset-x-[150%] -bottom-[150%] top-1/2 bg-[linear-gradient(to_bottom,#7a4a22_0%,#5b3518_30%,#3b220f_100%)] transition-opacity duration-700" />
                 <div className="absolute -inset-x-[150%] top-1/2 h-[2px] -translate-y-1/2 bg-white" />
                 {PITCH_LINES.map((deg) => {
                   const major = deg % 10 === 0;
@@ -379,6 +437,17 @@ export function Pfd() {
               >
                 PULL UP
               </div>
+
+              {/* Messages: gates, landings, go-arounds */}
+              <div
+                data-pfd="toast"
+                data-on="false"
+                aria-live="polite"
+                className="pointer-events-none absolute left-1/2 top-[19%] -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg bg-black/65 px-3.5 py-1.5 font-mono text-[11px] font-bold tracking-[.1em] opacity-0 backdrop-blur transition-[opacity,transform] duration-300 data-[on=true]:translate-y-0 data-[on=true]:opacity-100 data-[tone=amber]:text-amber data-[tone=cyan]:text-cyan data-[tone=green]:text-green data-[tone=red]:text-red md:text-[14px]"
+              />
+
+              {/* Reset fade */}
+              <div data-pfd="fade" className="pointer-events-none absolute inset-0 bg-black opacity-0" />
             </div>
           </div>
 
@@ -405,8 +474,8 @@ export function Pfd() {
       </div>
       <p className="mt-5 text-center font-mono text-[12px] tracking-[.1em] text-dim">
         <span>
-          <span className="hidden md:inline">MOVE YOUR MOUSE · YOU HAVE THE CONTROLS</span>
-          <span className="md:hidden">DRAG SIDEWAYS ACROSS THE DISPLAY TO BANK</span>
+          <span className="hidden md:inline">HOVER THE DISPLAY TO TAKE THE CONTROLS · FLY THE MAGENTA GATES · LAND ON RUNWAY 9</span>
+          <span className="md:hidden">DRAG SIDEWAYS TO BANK · FLY THE MAGENTA GATES</span>
         </span>
       </p>
     </div>
