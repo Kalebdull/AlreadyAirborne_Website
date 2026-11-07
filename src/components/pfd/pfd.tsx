@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { LogoMark } from "@/components/logo";
-import { createFlight, MAX_TOUCHDOWN_KT, modeLabel, readouts, step, type Controls, type FlightState } from "./flight-model";
+import { createFlight, inverseStickCurve, MAX_TOUCHDOWN_KT, modeLabel, NEUTRAL_PITCH, readouts, restart, step, type Controls, type FlightState, type Result } from "./flight-model";
 import { decode, encode, quantize, toControls, type Frame } from "./replay";
 import type { SvtScene } from "./scene";
 import { ScoreSubmit, type SubmitApi } from "./score-submit";
@@ -30,8 +30,9 @@ const PITCH_LINES = Array.from({ length: 25 }, (_, i) => (i - 12) * 2.5).filter(
 const ROLL_TICKS = [-60, -45, -30, -20, -10, 0, 10, 20, 30, 45, 60];
 
 const ENGAGE_DELAY = 250; // ms hovering before you take the controls
-const RELEASE_DELAY = 700; // ms after leaving before the autopilot takes back over
-const BEST_KEY = "aa-pfd-best-score-v2";
+const IDLE_RELEASE = 9000; // ms with no input at all before the autopilot takes back over
+const BEST_KEY = "aa-pfd-best-score-v3";
+const BEST_RUN_KEY = "aa-pfd-best-run-v3"; // the record run's recording, to submit later
 
 function headingLabel(deg: number) {
   const h = ((deg % 360) + 360) % 360;
@@ -83,6 +84,8 @@ export function Pfd() {
       flapPointer: q<HTMLDivElement>("flap-pointer"),
       flapText: q<HTMLSpanElement>("flap-text"),
       best: q<HTMLSpanElement>("best"),
+      bestPanel: q<HTMLButtonElement>("best-panel"),
+      runType: q<HTMLSpanElement>("run-type"),
       bestRank: q<HTMLSpanElement>("best-rank"),
       card: q<HTMLButtonElement>("card"),
       cardEyebrow: q<HTMLSpanElement>("card-eyebrow"),
@@ -97,17 +100,21 @@ export function Pfd() {
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const flight: FlightState = createFlight(reduced);
+    let bestRun: { result: Result; replay: string } | null = null;
     try {
       const saved = localStorage.getItem(BEST_KEY);
       if (saved !== null && Number.isFinite(Number(saved))) flight.best = Number(saved);
+      const run = localStorage.getItem(BEST_RUN_KEY);
+      if (run) bestRun = JSON.parse(run);
     } catch {}
 
     // --- Input ---------------------------------------------------------------------
     const input = {
       pointerX: 0,
       pointerY: 0,
-      hoverSince: -1, // when the mouse entered the display
-      leftAt: -Infinity, // when it last left
+      hoverSince: -1, // when the mouse entered the display (-1: not over it)
+      engaged: false, // you have the controls (until you press A or go idle)
+      lastInput: -Infinity,
       touchFlying: false,
       touching: false,
       stickX: 0, // filtered
@@ -118,31 +125,52 @@ export function Pfd() {
     };
     const keys = new Set<string>();
 
-    function wantsControl(now: number) {
-      if (input.touchFlying) return true;
-      if (input.hoverSince >= 0) return now - input.hoverSince > ENGAGE_DELAY;
-      return now - input.leftAt < RELEASE_DELAY;
+    function engage(now: number) {
+      input.lastInput = now;
+      if (input.engaged) return;
+      input.engaged = true;
+      // Bumpless handoff: start the stick where the airplane already is.
+      input.stickX = inverseStickCurve(Math.max(-1, Math.min(1, flight.roll / 40)));
+      input.stickY = inverseStickCurve(Math.max(-1, Math.min(1, (NEUTRAL_PITCH - flight.pitch) / 16)));
+      if (flight.phase === "ap" && flight.airborne) {
+        flight.toast = { text: "PRACTICE · PRESS R ON THE RUNWAY FOR A SCORED RUN", tone: "cyan", at: flight.time };
+      }
+    }
+
+    function release(message?: string) {
+      if (!input.engaged) return;
+      input.engaged = false;
+      input.touchFlying = false;
+      parts.svt.style.touchAction = "";
+      if (message) flight.toast = { text: message, tone: "cyan", at: flight.time };
     }
 
     function controls(now: number, dt: number): Controls {
-      const flying = wantsControl(now);
+      if (input.hoverSince >= 0 && now - input.hoverSince > ENGAGE_DELAY) engage(now);
+      // Walk away for a while and the autopilot takes back over.
+      if (input.engaged && input.hoverSince < 0 && !input.touching && now - input.lastInput > IDLE_RELEASE) {
+        release("AUTOPILOT ENGAGED · YOU LET GO");
+      }
+
+      // Over the display (or touching it) the stick follows you; off it, the
+      // stick eases back to neutral: wings level, nose on the horizon.
       let target = { x: 0, y: 0 };
-      if (flying && (input.hoverSince >= 0 || input.touching)) {
+      if (input.engaged && (input.hoverSince >= 0 || input.touching)) {
         const rect = parts.svt.getBoundingClientRect();
         target = {
           x: Math.max(-1, Math.min(1, (input.pointerX - (rect.left + rect.width / 2)) / (rect.width / 2))),
           y: Math.max(-1, Math.min(1, (input.pointerY - (rect.top + rect.height / 2)) / (rect.height / 2))),
         };
       }
-      // Low-pass the stick so a twitchy mouse still flies smoothly.
-      const k = 1 - Math.exp(-dt / 0.09);
+      // Smooth the stick so a twitchy mouse still flies like silk.
+      const k = 1 - Math.exp(-dt / 0.07);
       input.stickX += (target.x - input.stickX) * k;
       input.stickY += (target.y - input.stickY) * k;
 
       const up = keys.has("w") || keys.has("arrowup") ? 1 : 0;
       const down = keys.has("s") || keys.has("arrowdown") ? 1 : 0;
       const c: Controls = {
-        stick: flying ? { x: input.stickX, y: input.stickY } : null,
+        stick: input.engaged ? { x: input.stickX, y: input.stickY } : null,
         throttle: Math.max(-1, Math.min(1, up - down + input.throttleHeld)),
         flaps: input.flaps,
         retry: input.retry,
@@ -168,7 +196,14 @@ export function Pfd() {
     // be verified by the server (see replay.ts).
     let frames: Frame[] = [];
     let recording = true;
+    let recordedRun = flight.resets;
     let pending: { replay: string } | null = null;
+    function startRecording() {
+      frames = [];
+      recording = true;
+      recordedRun = flight.resets;
+      pending = null;
+    }
     actionsRef.current = {
       flyAgain: () => {
         input.retry = true;
@@ -184,9 +219,7 @@ export function Pfd() {
           scripted = decode(data);
           scriptedAt = 0;
           Object.assign(flight, createFlight(), { best: flight.best, resets: flight.resets + 1, time: flight.time });
-          frames = [];
-          recording = true;
-          pending = null;
+          startRecording();
         },
       };
     }
@@ -272,7 +305,7 @@ export function Pfd() {
       const text = [
         r.iasText, r.altText, r.hdgText, r.vsText, modeLabel(s), s.phase, s.altSel, r.gatesText,
         r.stallWarning, r.vfeWarning, r.overspeedWarning, r.terrainWarning,
-        Math.round(s.throttle * 100), s.flapsCmd, s.best, input.touchFlying, showToast ? s.toast!.at : "", r.windText,
+        Math.round(s.throttle * 100), s.flapsCmd, s.best, input.touchFlying, showToast ? s.toast!.at : "", r.windText, s.apUsed, s.airborne, Boolean(bestRun),
       ].join("|");
       if (text !== lastText) {
         lastText = text;
@@ -293,7 +326,12 @@ export function Pfd() {
         parts.pwrText.textContent = `${Math.round(s.throttle * 100)}%`;
         parts.flapText.textContent = `${s.flapsCmd}°`;
         parts.best.textContent = s.best === null ? "—" : s.best.toLocaleString();
-        parts.bestRank.textContent = s.best === null ? "HAND-FLY A LAP TO SCORE" : "YOUR BEST SCORE";
+        parts.bestRank.textContent = s.best === null ? "PRESS R FOR A SCORED RUN" : bestRun ? "SUBMIT RECORD ›" : "YOUR BEST SCORE";
+        parts.bestPanel.disabled = !bestRun;
+        const flying = s.phase === "manual" || (s.phase === "ap" && s.airborne);
+        parts.runType.textContent = s.phase === "manual" ? (s.apUsed ? "PRACTICE" : "SCORED RUN") : "";
+        parts.runType.dataset.kind = s.phase === "manual" && !s.apUsed ? "scored" : "practice";
+        parts.runType.hidden = !flying || s.phase !== "manual";
         parts.touchToggle.textContent = input.touchFlying ? "AP" : "FLY";
         parts.touchToggle.dataset.on = String(input.touchFlying);
         if (showToast) {
@@ -321,23 +359,31 @@ export function Pfd() {
       const dt = Math.min(0.05, Math.max(0, (t - last) / 1000));
       last = t;
       const c = controls(t, dt);
-      // Test playback runs several recorded frames per screen frame.
-      const reps = scripted && scriptedAt < scripted.length ? 4 : 1;
+      // Test playback runs several recorded frames per screen frame; the
+      // leaderboard panel pauses the sim entirely.
+      const reps = holdRef.current ? 0 : scripted && scriptedAt < scripted.length ? 4 : 1;
       for (let i = 0; i < reps; i++) {
         const f = scripted && scriptedAt < scripted.length ? scripted[scriptedAt++] : quantize(dt, c);
-        const before = flight.resets;
         // Keep a ranked result on screen until you choose to submit or fly again.
         const resultUp = flight.result?.ranked === true && (flight.phase === "rollout" || flight.phase === "landed");
         step(flight, f.dt, toControls(f, { retry: c.retry && !holdRef.current, hold: holdRef.current || resultUp }));
-        if (flight.resets !== before) {
-          frames = [];
-          recording = true;
-          pending = null;
+        if (flight.resets !== recordedRun) {
+          // The run ended and reset during this step; record from the next one.
+          startRecording();
         } else if (recording) {
           frames.push(f);
           if (flight.phase === "rollout" || flight.phase === "failed" || flight.phase === "landed" || frames.length > 60000) {
             recording = false;
-            if (flight.result?.ranked) pending = { replay: encode(frames) };
+            if (flight.result?.ranked) {
+              pending = { replay: encode(frames) };
+              // Keep your record run so you can submit it any time later.
+              if (flight.result.newBest) {
+                bestRun = { result: flight.result, replay: pending.replay };
+                try {
+                  localStorage.setItem(BEST_RUN_KEY, JSON.stringify(bestRun));
+                } catch {}
+              }
+            }
           }
         }
       }
@@ -387,17 +433,15 @@ export function Pfd() {
       const inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
       input.pointerX = e.clientX;
       input.pointerY = e.clientY;
-      if (inside && input.hoverSince < 0) input.hoverSince = performance.now();
-      if (!inside && input.hoverSince >= 0) {
+      if (inside) {
+        if (input.hoverSince < 0) input.hoverSince = performance.now();
+        if (input.engaged) input.lastInput = performance.now();
+      } else {
         input.hoverSince = -1;
-        input.leftAt = performance.now();
       }
     };
     const onLeaveWindow = () => {
-      if (input.hoverSince >= 0) {
-        input.hoverSince = -1;
-        input.leftAt = performance.now();
-      }
+      input.hoverSince = -1;
     };
     // Touch: once FLY is on, drag on the display to steer.
     const onTouch = (e: PointerEvent) => {
@@ -406,21 +450,40 @@ export function Pfd() {
       input.touching = e.type !== "pointerup" && e.type !== "pointercancel";
       input.pointerX = e.clientX;
       input.pointerY = e.clientY;
+      input.lastInput = performance.now();
     };
-    const armed = () => input.touchFlying || input.hoverSince >= 0 || flight.phase === "manual";
+    const armed = () => input.engaged || input.hoverSince >= 0 || visible;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
       if (target && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
       const key = e.key.toLowerCase();
-      const over = flight.phase === "failed" || flight.phase === "landed";
-      if (!armed() && !(key === "r" && over)) return;
-      if (["arrowup", "arrowdown", " "].includes(key)) e.preventDefault();
+      if (!armed() || holdRef.current) return;
+      const flightKeys = ["w", "s", "arrowup", "arrowdown", "f", "v", "r", "a", " "];
+      if (!flightKeys.includes(key)) return;
+      // Arrow keys and space only belong to the game while you're flying.
+      if (["arrowup", "arrowdown", " "].includes(key)) {
+        if (!input.engaged) return;
+        e.preventDefault();
+      }
       if (e.repeat) return;
+      const now = performance.now();
+      if (key === "a") {
+        release("AUTOPILOT ENGAGED");
+        return;
+      }
+      engage(now);
       keys.add(key);
       if (key === "f") input.flaps = 1;
       if (key === "v") input.flaps = -1;
-      if (key === "r" || key === " ") input.retry = true;
+      if (key === "r" || key === " ") {
+        input.retry = true;
+        // Mid-flight, R starts a fresh scored run from the runway.
+        if (flight.phase === "manual" || flight.phase === "ap") {
+          restart(flight);
+          startRecording();
+        }
+      }
     };
     const onKeyUp = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase());
     const onBlur = () => keys.clear();
@@ -431,6 +494,7 @@ export function Pfd() {
       const dir = Number(b.dataset.hold);
       const down = (e: Event) => {
         e.preventDefault();
+        engage(performance.now());
         input.throttleHeld = dir;
         if ("pointerId" in e) b.setPointerCapture((e as PointerEvent).pointerId);
       };
@@ -446,17 +510,30 @@ export function Pfd() {
       const button = (e.target as HTMLElement).closest<HTMLElement>("[data-action]");
       if (!button || !el.contains(button)) return;
       const action = button.dataset.action;
+      if (action === "flaps-down" || action === "flaps-up") engage(performance.now());
       if (action === "flaps-down") input.flaps = 1;
       if (action === "flaps-up") input.flaps = -1;
-      if (action === "retry") input.retry = true;
+      if (action === "retry") {
+        engage(performance.now());
+        input.retry = true;
+      }
+      if (action === "submit-best" && bestRun) {
+        submitRef.current?.open(bestRun);
+        lastCard = "";
+      }
       if (action === "submit" && pending && flight.result) {
         submitRef.current?.open({ result: flight.result, replay: pending.replay });
         lastCard = "";
       }
       if (action === "touch-toggle") {
-        input.touchFlying = !input.touchFlying;
-        input.touching = false;
-        parts.svt.style.touchAction = input.touchFlying ? "none" : "";
+        if (input.touchFlying) {
+          release("AUTOPILOT ENGAGED");
+        } else {
+          input.touchFlying = true;
+          input.touching = false;
+          parts.svt.style.touchAction = "none";
+          engage(performance.now());
+        }
       }
     };
 
@@ -527,6 +604,12 @@ export function Pfd() {
             <span>
               GATES <span data-pfd="gates" className="text-magenta">0/{GATES.length}</span>
             </span>
+            <span
+              data-pfd="run-type"
+              data-kind="practice"
+              hidden
+              className="rounded-md px-2 py-0.5 font-bold data-[kind=practice]:bg-white/10 data-[kind=practice]:text-soft data-[kind=scored]:bg-magenta/15 data-[kind=scored]:text-magenta"
+            />
             <span
               data-pfd="mode"
               data-mode="ap"
@@ -736,15 +819,21 @@ export function Pfd() {
               </div>
 
               {/* Personal best */}
-              <div className="pointer-events-none absolute bottom-3 right-3 hidden flex-col items-end rounded-xl bg-black/60 px-3 py-2 font-mono ring-1 ring-white/15 backdrop-blur sm:flex md:bottom-6 md:right-6">
+              <button
+                type="button"
+                data-pfd="best-panel"
+                data-action="submit-best"
+                disabled
+                className="absolute bottom-3 right-3 hidden flex-col items-end rounded-xl bg-black/60 px-3 py-2 text-right font-mono ring-1 ring-white/15 backdrop-blur transition enabled:cursor-pointer enabled:hover:ring-magenta sm:flex md:bottom-6 md:right-6"
+              >
                 <span className="text-[9px] tracking-[.12em] text-dim md:text-[10px]">PERSONAL BEST</span>
                 <span data-pfd="best" className="font-display text-xl font-semibold tabular-nums md:text-2xl">
                   —
                 </span>
                 <span data-pfd="best-rank" className="text-[9px] tracking-[.1em] text-magenta md:text-[10px]">
-                  HAND-FLY A LAP TO SCORE
+                  PRESS R FOR A SCORED RUN
                 </span>
-              </div>
+              </button>
 
               {/* Annunciations: amber is caution, red is warning */}
               <div className="pointer-events-none absolute left-1/2 top-[29%] flex -translate-x-1/2 flex-col items-center gap-1.5 font-mono text-[13px] font-bold tracking-[.14em] md:text-base">
@@ -833,8 +922,8 @@ export function Pfd() {
 
       <div className="mt-5 flex flex-col items-center gap-2 text-center font-mono text-[11px] tracking-[.1em] text-dim md:text-[12px]">
         <p className="hidden md:block">
-          HOVER TO FLY · <span className="text-ink">MOUSE</span> YOKE · <span className="text-ink">W/S</span> POWER · <span className="text-ink">F/V</span> FLAPS ·{" "}
-          <span className="text-ink">R</span> RETRY
+          <span className="text-ink">R</span> SCORED RUN · <span className="text-ink">MOUSE</span> YOKE · <span className="text-ink">W/S</span> POWER ·{" "}
+          <span className="text-ink">F/V</span> FLAPS · <span className="text-ink">A</span> AUTOPILOT
         </p>
         <p className="md:hidden">TAP FLY · DRAG TO STEER · BUTTONS FOR POWER &amp; FLAPS</p>
         <p className="max-w-[640px] text-[10px] leading-relaxed md:text-[11px]">

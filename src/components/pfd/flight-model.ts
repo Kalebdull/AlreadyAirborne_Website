@@ -51,6 +51,8 @@ export type FlightState = {
   alt: number; // ft MSL
   pitch: number; // deg, nose up +
   roll: number; // deg, right wing down +
+  pitchRate: number; // deg/s
+  rollRate: number; // deg/s
   ias: number; // kt
   vs: number; // ft/min
   hdg: number; // deg
@@ -113,6 +115,16 @@ export const EYE_HEIGHT = 8;
 
 const STEP = 1 / 120;
 const deg = Math.PI / 180;
+
+// Stick response curve: gentle near center for fine corrections, full
+// authority at the edges. Lives in the model so replays match exactly.
+export const stickCurve = (v: number) => 0.35 * v + 0.65 * v * v * v;
+export function inverseStickCurve(target: number) {
+  let v = target;
+  for (let i = 0; i < 6; i++) v -= (stickCurve(v) - target) / (0.35 + 1.95 * v * v);
+  return Math.max(-1, Math.min(1, v));
+}
+export const NEUTRAL_PITCH = 4;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 export const angleDiff = (to: number, from: number) => ((to - from + 540) % 360) - 180;
 
@@ -163,6 +175,8 @@ export function createFlight(reduced = false): FlightState {
     alt: FIELD,
     pitch: 0,
     roll: 0,
+    pitchRate: 0,
+    rollRate: 0,
     ias: 0,
     vs: 0,
     hdg: 90,
@@ -220,6 +234,11 @@ function fail(s: FlightState, title: string, tip: string) {
 function reset(s: FlightState) {
   const keep = { time: s.time, simTime: s.simTime, resets: s.resets + 1, best: s.best };
   Object.assign(s, createFlight(), keep, { fade: 1, fadingIn: true });
+}
+
+// Back to brake release on the runway, right now.
+export function restart(s: FlightState) {
+  reset(s);
 }
 
 export function step(s: FlightState, dtReal: number, c: Controls) {
@@ -281,9 +300,9 @@ function physics(s: FlightState, h: number, hReal: number, c: Controls) {
     pitchTarget = 0;
   } else if (s.phase === "manual" && c.stick) {
     s.throttleCmd = clamp(s.throttleCmd + c.throttle * 0.7 * hReal, 0, 1);
-    pitchTarget = 4 - c.stick.y * 16;
+    pitchTarget = NEUTRAL_PITCH - stickCurve(c.stick.y) * 16;
     if (s.airborne) {
-      rollTarget = c.stick.x * 40;
+      rollTarget = stickCurve(c.stick.x) * 40;
     } else {
       // On the runway the nose only comes up once there's enough speed.
       pitchTarget = s.ias < 45 ? 0 : clamp(pitchTarget, 0, 12);
@@ -304,8 +323,12 @@ function physics(s: FlightState, h: number, hReal: number, c: Controls) {
 
   // --- Controls and configuration ------------------------------------------------
   const manual = s.phase === "manual";
-  s.roll += (rollTarget - s.roll) * Math.min(1, (manual ? 2.6 : 1.5) * h);
-  s.pitch += (pitchTarget - s.pitch) * Math.min(1, (manual ? 2.2 : 1.4) * h);
+  // Attitude follows its target like a critically damped spring: it eases
+  // in and out of every change instead of snapping.
+  const wRoll = manual ? 3.0 : 1.9;
+  const wPitch = manual ? 2.6 : 1.7;
+  s.rollRate += (wRoll * wRoll * (rollTarget - s.roll) - 2 * wRoll * s.rollRate) * h;
+  s.pitchRate += (wPitch * wPitch * (pitchTarget - s.pitch) - 2 * wPitch * s.pitchRate) * h;
   s.throttle += clamp(s.throttleCmd - s.throttle, -1.5 * h, 1.5 * h);
   s.flaps += clamp(s.flapsCmd - s.flaps, -3.5 * h, 3.5 * h);
 
@@ -315,9 +338,13 @@ function physics(s: FlightState, h: number, hReal: number, c: Controls) {
   if (s.airborne) {
     const t = s.runTime;
     const gust = (wind.speed - 8) / 6;
-    s.roll += gust * (3.2 * Math.sin(t * 1.31) + 2.1 * Math.sin(t * 2.87 + 2.1) + 1.2 * Math.sin(t * 5.3 + 0.7)) * h;
-    s.pitch += gust * (0.9 * Math.sin(t * 1.07 + 1.1) + 0.6 * Math.sin(t * 3.41)) * h;
+    // Gusts push on the airplane (they change its rotation rate), so the
+    // motion stays smooth while you still have to correct for it.
+    s.rollRate += gust * (9 * Math.sin(t * 1.31) + 6 * Math.sin(t * 2.37 + 2.1)) * h;
+    s.pitchRate += gust * (2.6 * Math.sin(t * 1.07 + 1.1) + 1.6 * Math.sin(t * 2.11)) * h;
   }
+  s.roll += s.rollRate * h;
+  s.pitch += s.pitchRate * h;
   s.aoa = aoaFor(s.ias, s.flaps, s.airborne ? s.roll : 0);
 
   // --- Energy -------------------------------------------------------------------
@@ -344,6 +371,7 @@ function physics(s: FlightState, h: number, hReal: number, c: Controls) {
     s.hdg += ((1091 * Math.tan(s.roll * deg)) / Math.max(s.ias, 40)) * h;
   } else {
     s.roll += -s.roll * Math.min(1, 3 * h);
+    s.rollRate = 0;
     s.hdg += angleDiff(RUNWAY.heading, s.hdg) * Math.min(1, 0.8 * h);
     s.z += -s.z * Math.min(1, 0.3 * h); // stay on the centerline
   }
