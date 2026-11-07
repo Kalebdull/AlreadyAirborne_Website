@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { LogoMark } from "@/components/logo";
-import { createFlight, inverseStickCurve, MAX_TOUCHDOWN_KT, modeLabel, NEUTRAL_PITCH, readouts, restart, step, type Controls, type FlightState, type Result } from "./flight-model";
+import { createRun, inverseStickCurve, modeLabel, readouts, restart, step, type Controls, type FlightState, type RunResult } from "./flight-model";
 import { decode, encode, quantize, toControls, type Frame } from "./replay";
 import type { SvtScene } from "./scene";
 import { ScoreSubmit, type SubmitApi } from "./score-submit";
-import { GATES } from "./world";
+import { LEVEL_COUNT, LEVELS } from "./levels";
 
 // A working Garmin-style primary flight display with synthetic vision, and
 // a game: fly the magenta pathway around the traffic pattern and land as
@@ -25,14 +25,14 @@ const PPH = 6; // heading tape: px per degree
 const SPEEDS = Array.from({ length: 23 }, (_, i) => i * 10); // 0–220 kt
 const ALTS = Array.from({ length: 121 }, (_, i) => i * 100); // 0–12,000 ft
 const HEADINGS = Array.from({ length: 73 }, (_, i) => i * 10 - 180); // -180–540°
-const INITIAL = createFlight(); // first frame, rendered on the server
+const INITIAL = createRun(); // first frame, rendered on the server
 const PITCH_LINES = Array.from({ length: 25 }, (_, i) => (i - 12) * 2.5).filter((d) => d !== 0);
 const ROLL_TICKS = [-60, -45, -30, -20, -10, 0, 10, 20, 30, 45, 60];
 
 const ENGAGE_DELAY = 250; // ms hovering before you take the controls
 const IDLE_RELEASE = 9000; // ms with no input at all before the autopilot takes back over
-const BEST_KEY = "aa-pfd-best-score-v3";
-const BEST_RUN_KEY = "aa-pfd-best-run-v3"; // the record run's recording, to submit later
+const BEST_KEY = "aa-pfd-best-run-score-v4";
+const BEST_RUN_KEY = "aa-pfd-best-run-v4"; // the record run's recording, to submit later
 
 function headingLabel(deg: number) {
   const h = ((deg % 360) + 360) % 360;
@@ -87,6 +87,16 @@ export function Pfd() {
       bestPanel: q<HTMLButtonElement>("best-panel"),
       runType: q<HTMLSpanElement>("run-type"),
       bestRank: q<HTMLSpanElement>("best-rank"),
+      level: q<HTMLSpanElement>("level"),
+      runScore: q<HTMLSpanElement>("run-score"),
+      windArrow: q<HTMLDivElement>("wind-arrow"),
+      windSpeed: q<HTMLSpanElement>("wind-speed"),
+      windFrom: q<HTMLSpanElement>("wind-from"),
+      landBy: q<HTMLSpanElement>("land-by"),
+      intro: q<HTMLDivElement>("intro"),
+      introLevel: q<HTMLSpanElement>("intro-level"),
+      introName: q<HTMLSpanElement>("intro-name"),
+      introChips: q<HTMLDivElement>("intro-chips"),
       card: q<HTMLButtonElement>("card"),
       cardEyebrow: q<HTMLSpanElement>("card-eyebrow"),
       cardTitle: q<HTMLSpanElement>("card-title"),
@@ -99,8 +109,8 @@ export function Pfd() {
     const fallback = el.querySelectorAll<HTMLElement>('[data-pfd="fallback"]');
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const flight: FlightState = createFlight(reduced);
-    let bestRun: { result: Result; replay: string } | null = null;
+    const flight: FlightState = createRun(reduced);
+    let bestRun: { result: RunResult; replay: string } | null = null;
     try {
       const saved = localStorage.getItem(BEST_KEY);
       if (saved !== null && Number.isFinite(Number(saved))) flight.best = Number(saved);
@@ -131,9 +141,9 @@ export function Pfd() {
       input.engaged = true;
       // Bumpless handoff: start the stick where the airplane already is.
       input.stickX = inverseStickCurve(Math.max(-1, Math.min(1, flight.roll / 40)));
-      input.stickY = inverseStickCurve(Math.max(-1, Math.min(1, (NEUTRAL_PITCH - flight.pitch) / 16)));
-      if (flight.phase === "ap" && flight.airborne) {
-        flight.toast = { text: "PRACTICE · PRESS R ON THE RUNWAY FOR A SCORED RUN", tone: "cyan", at: flight.time };
+      input.stickY = inverseStickCurve(Math.max(-1, Math.min(1, (flight.trimPitch - flight.pitch) / 16)));
+      if (flight.apUsed && (flight.phase === "ap" || flight.phase === "manual")) {
+        flight.toast = { text: "PRACTICE · PRESS R TO START A SCORED RUN", tone: "cyan", at: flight.time };
       }
     }
 
@@ -188,6 +198,7 @@ export function Pfd() {
     let last = performance.now();
     let lastText = "";
     let lastCard = "";
+    let lastIntro = "";
     let lastSecond = -1;
     let savedBest = flight.best;
     let resizeObserver: ResizeObserver | null = null;
@@ -218,19 +229,21 @@ export function Pfd() {
         play(data: string) {
           scripted = decode(data);
           scriptedAt = 0;
-          Object.assign(flight, createFlight(), { best: flight.best, resets: flight.resets + 1, time: flight.time });
+          Object.assign(flight, createRun(), { best: flight.best, resets: flight.resets + 1, time: flight.time });
           startRecording();
         },
       };
     }
 
     function renderCard(s: FlightState) {
-      const show = !holdRef.current && (s.phase === "failed" || ((s.phase === "landed" || s.phase === "rollout") && s.result !== null));
-      const key = show ? `${s.phase === "failed" ? "f" : "r"}|${s.resets}` : "hidden";
+      const over = (s.phase === "failed" || s.phase === "complete") && s.result !== null;
+      const show = !holdRef.current && over;
+      const key = show ? `${s.phase}|${s.resets}` : "hidden";
       if (key === lastCard) return;
       lastCard = key;
       parts.card.dataset.on = show ? "true" : "false";
       if (!show) return;
+      const r = s.result!;
       const cells = (stats: [string, string][]) =>
         stats.map(([label, value]) => {
           const cell = document.createElement("div");
@@ -239,40 +252,61 @@ export function Pfd() {
           l.className = "text-[9px] tracking-[.12em] text-dim md:text-[10px]";
           l.textContent = label;
           const v = document.createElement("span");
-          v.className = `text-[13px] tabular-nums md:text-[14px] ${value.startsWith("-") ? "text-red" : "text-ink"}`;
+          v.className = "text-[13px] tabular-nums text-ink md:text-[14px]";
           v.textContent = value;
           cell.append(l, v);
           return cell;
         });
       if (s.phase === "failed" && s.failure) {
         parts.card.dataset.tone = "red";
-        parts.cardEyebrow.textContent = "RUN OVER";
+        parts.cardEyebrow.textContent = `RUN OVER · LEVEL ${r.levelReached}`;
         parts.cardTitle.textContent = s.failure.title;
         parts.cardSub.textContent = s.failure.tip;
-        parts.cardStats.replaceChildren();
-        parts.cardSubmit.hidden = true;
-        parts.cardHint.textContent = "";
-        return;
+      } else {
+        parts.card.dataset.tone = r.newBest ? "magenta" : "green";
+        parts.cardEyebrow.textContent = "ALL TEN LANDED";
+        parts.cardTitle.textContent = "RUN COMPLETE";
+        parts.cardSub.textContent = "Checkride passed. That's the whole game.";
       }
-      const r = s.result!;
-      const b = r.breakdown;
-      parts.card.dataset.tone = r.newBest ? "magenta" : "green";
-      parts.cardEyebrow.textContent = r.newBest ? "NEW PERSONAL BEST" : r.ranked ? "SCORE" : "AUTOPILOT HELPED · NOT RANKED";
-      parts.cardTitle.textContent = r.score.toLocaleString();
-      parts.cardSub.textContent = `${r.rank} · ${r.distance.toLocaleString()} ft past the threshold`;
-      const fmt = (n: number) => (n > 0 ? `+${n}` : String(n));
       parts.cardStats.replaceChildren(
         ...cells([
-          ["GATES", fmt(b.gates)],
-          ["LANDING", fmt(b.landing)],
-          ["TOUCHDOWN", fmt(b.touchdown)],
-          ["CENTERLINE", fmt(b.centerline)],
-          ["TIME", fmt(b.time)],
-          ["PENALTIES", b.penalties ? String(b.penalties) : "0"],
+          ["RUN SCORE", r.score.toLocaleString()],
+          ["LEVELS", `${r.cleared}/${LEVEL_COUNT}`],
+          ["BEST", s.best === null ? "—" : s.best.toLocaleString()],
         ]),
       );
-      parts.cardSubmit.hidden = !r.ranked;
-      parts.cardHint.textContent = r.ranked ? "" : "PRESS R AND HAND-FLY FROM THE TAKEOFF ROLL TO SCORE";
+      const canSubmit = r.ranked && r.score > 0;
+      parts.cardSubmit.hidden = !canSubmit;
+      parts.cardHint.textContent = r.newBest
+        ? "NEW PERSONAL BEST"
+        : !r.ranked && r.score > 0
+          ? "AUTOPILOT FLEW PART OF THIS RUN · PRESS R FOR A RANKED ONE"
+          : "";
+      parts.cardHint.dataset.tone = r.newBest ? "magenta" : "amber";
+    }
+
+    function renderIntro(s: FlightState) {
+      const key = s.phase === "intro" ? `${s.levelIndex}|${s.resets}` : "";
+      if (key === lastIntro) return;
+      lastIntro = key;
+      parts.intro.dataset.on = key ? "true" : "false";
+      if (!key) return;
+      const level = LEVELS[s.levelIndex];
+      parts.introLevel.textContent = `LEVEL ${level.number} / ${LEVEL_COUNT}`;
+      parts.introName.textContent = level.name;
+      const chips = [
+        `${level.course.rings.length} RINGS · ${Math.round(level.ringRadius * 2)} FT`,
+        level.wind ? `WIND ${String(level.windFrom).padStart(3, "0")}° ${level.wind}${level.gust ? `G${level.wind + level.gust}` : ""} KT` : "WIND CALM",
+        `LAND BY ${level.landBy.toLocaleString()} FT`,
+      ];
+      parts.introChips.replaceChildren(
+        ...chips.map((text) => {
+          const chip = document.createElement("span");
+          chip.className = "rounded-full bg-black/65 px-3 py-1 ring-1 ring-white/15";
+          chip.textContent = text;
+          return chip;
+        }),
+      );
     }
 
     function render(s: FlightState) {
@@ -299,13 +333,15 @@ export function Pfd() {
 
       svt?.update(s, r);
       renderCard(s);
+      renderIntro(s);
+      parts.windArrow.style.transform = `rotate(${r.windArrow}deg)`;
 
       // Text only changes a few times a second; skip DOM writes when equal.
-      const showToast = s.toast && s.time - s.toast.at < (s.toast.text.startsWith("GATE") ? 1.4 : 3.2);
+      const showToast = s.phase !== "intro" && s.toast && s.time - s.toast.at < (s.toast.text.startsWith("RING") ? 1.4 : 2.6);
       const text = [
-        r.iasText, r.altText, r.hdgText, r.vsText, modeLabel(s), s.phase, s.altSel, r.gatesText,
+        r.iasText, r.altText, r.hdgText, r.vsText, modeLabel(s), s.phase, s.altSel, r.ringsText, s.levelIndex, s.runScore, r.windSpeed, r.windFrom,
         r.stallWarning, r.vfeWarning, r.overspeedWarning, r.terrainWarning,
-        Math.round(s.throttle * 100), s.flapsCmd, s.best, input.touchFlying, showToast ? s.toast!.at : "", r.windText, s.apUsed, s.airborne, Boolean(bestRun),
+        Math.round(s.throttle * 100), s.flapsCmd, s.best, input.touchFlying, showToast ? s.toast!.at : "", s.apUsed, s.airborne, Boolean(bestRun),
       ].join("|");
       if (text !== lastText) {
         lastText = text;
@@ -315,8 +351,13 @@ export function Pfd() {
         parts.hdgText.textContent = `${r.hdgText}°`;
         parts.vsiText.textContent = r.vsText;
         parts.altSel.textContent = String(s.altSel);
-        parts.gates.textContent = r.gatesText;
-        parts.wind.textContent = r.windText;
+        parts.gates.textContent = r.ringsText;
+        parts.level.textContent = `${s.levelIndex + 1}/${LEVEL_COUNT}`;
+        parts.runScore.textContent = s.runScore.toLocaleString();
+        parts.windSpeed.textContent = r.windSpeed ? `${r.windSpeed}` : "CALM";
+        parts.windFrom.textContent = r.windSpeed ? `${String(r.windFrom).padStart(3, "0")}°` : "";
+        parts.windArrow.hidden = !r.windSpeed;
+        parts.landBy.textContent = LEVELS[s.levelIndex].landBy.toLocaleString();
         parts.mode.textContent = modeLabel(s);
         parts.mode.dataset.mode = s.phase;
         parts.annStall.dataset.on = String(r.stallWarning);
@@ -326,10 +367,10 @@ export function Pfd() {
         parts.pwrText.textContent = `${Math.round(s.throttle * 100)}%`;
         parts.flapText.textContent = `${s.flapsCmd}°`;
         parts.best.textContent = s.best === null ? "—" : s.best.toLocaleString();
-        parts.bestRank.textContent = s.best === null ? "PRESS R FOR A SCORED RUN" : bestRun ? "SUBMIT RECORD ›" : "YOUR BEST SCORE";
+        parts.bestRank.textContent = s.best === null ? "PRESS R TO START A RUN" : bestRun ? "SUBMIT RECORD ›" : "BEST RUN";
         parts.bestPanel.disabled = !bestRun;
         const flying = s.phase === "manual" || (s.phase === "ap" && s.airborne);
-        parts.runType.textContent = s.phase === "manual" ? (s.apUsed ? "PRACTICE" : "SCORED RUN") : "";
+        parts.runType.textContent = s.phase === "manual" ? (s.apUsed ? "PRACTICE" : "RANKED RUN") : "";
         parts.runType.dataset.kind = s.phase === "manual" && !s.apUsed ? "scored" : "practice";
         parts.runType.hidden = !flying || s.phase !== "manual";
         parts.touchToggle.textContent = input.touchFlying ? "AP" : "FLY";
@@ -365,16 +406,16 @@ export function Pfd() {
       for (let i = 0; i < reps; i++) {
         const f = scripted && scriptedAt < scripted.length ? scripted[scriptedAt++] : quantize(dt, c);
         // Keep a ranked result on screen until you choose to submit or fly again.
-        const resultUp = flight.result?.ranked === true && (flight.phase === "rollout" || flight.phase === "landed");
+        const resultUp = flight.result !== null && flight.result.ranked && flight.result.score > 0 && (flight.phase === "failed" || flight.phase === "complete");
         step(flight, f.dt, toControls(f, { retry: c.retry && !holdRef.current, hold: holdRef.current || resultUp }));
         if (flight.resets !== recordedRun) {
           // The run ended and reset during this step; record from the next one.
           startRecording();
         } else if (recording) {
           frames.push(f);
-          if (flight.phase === "rollout" || flight.phase === "failed" || flight.phase === "landed" || frames.length > 60000) {
+          if (flight.phase === "failed" || flight.phase === "complete" || frames.length > 150000) {
             recording = false;
-            if (flight.result?.ranked) {
+            if (flight.result?.ranked && flight.result.score > 0) {
               pending = { replay: encode(frames) };
               // Keep your record run so you can submit it any time later.
               if (flight.result.newBest) {
@@ -590,7 +631,7 @@ export function Pfd() {
       >
         <div className="flex flex-col overflow-hidden rounded-[22px] bg-black md:rounded-[27px]">
           {/* Top strip */}
-          <div className="flex h-9 items-center gap-4 border-b border-white/10 bg-[#0b0b0c] px-4 font-mono text-[11px] tracking-[.06em] text-dim md:h-10 md:gap-6 md:px-5 md:text-[12px]">
+          <div className="flex h-9 items-center gap-3 whitespace-nowrap border-b border-white/10 bg-[#0b0b0c] px-3 font-mono text-[10px] tracking-[.06em] text-dim sm:gap-4 sm:px-4 sm:text-[11px] md:h-10 md:gap-6 md:px-5 md:text-[12px]">
             <span className="flex items-center gap-2 text-ink">
               <LogoMark size={20} />
               <span className="hidden sm:inline">AA-PFD</span>
@@ -598,11 +639,14 @@ export function Pfd() {
             <span className="hidden md:inline">
               GS <span data-pfd="gs" className="text-ink">---</span>KT
             </span>
-            <span className="hidden lg:inline">
-              WIND <span data-pfd="wind" className="text-ink">160°/10</span>
-            </span>
             <span>
-              GATES <span data-pfd="gates" className="text-magenta">0/{GATES.length}</span>
+              LVL <span data-pfd="level" className="text-cyan">1/{LEVEL_COUNT}</span>
+            </span>
+            <span className="hidden sm:inline">
+              RINGS <span data-pfd="gates" className="text-magenta">0/{LEVELS[0].course.rings.length}</span>
+            </span>
+            <span className="hidden lg:inline">
+              RUN <span data-pfd="run-score" className="text-ink">0</span>
             </span>
             <span
               data-pfd="run-type"
@@ -617,7 +661,11 @@ export function Pfd() {
             >
               TO/GA
             </span>
-            <span data-pfd="utc" className="hidden tabular-nums text-ink sm:inline">
+            <span className="whitespace-nowrap">
+              LAND BY <span data-pfd="land-by" className="font-bold text-[#ff3b6b]">3,000</span>
+              <span className="hidden sm:inline"> FT</span>
+            </span>
+            <span data-pfd="utc" className="hidden tabular-nums text-ink xl:inline">
               00:00:00Z
             </span>
           </div>
@@ -835,6 +883,36 @@ export function Pfd() {
                 </span>
               </button>
 
+              {/* Wind: an arrow showing where it's blowing, relative to your nose */}
+              <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-xl bg-black/60 px-2.5 py-2 font-mono ring-1 ring-white/15 backdrop-blur md:left-6 md:top-4 md:gap-3 md:px-3">
+                <div className="relative h-9 w-9 rounded-full ring-1 ring-white/20 md:h-11 md:w-11">
+                  <div data-pfd="wind-arrow" className="absolute inset-0 flex items-center justify-center will-change-transform">
+                    <svg viewBox="0 0 24 24" className="h-7 w-7 md:h-8 md:w-8" aria-hidden>
+                      <path d="M12 3 L17 10 H13.5 V21 H10.5 V10 H7 Z" fill="#22d3ee" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="flex flex-col leading-tight">
+                  <span className="text-[9px] tracking-[.12em] text-dim md:text-[10px]">WIND</span>
+                  <span className="text-[15px] font-bold tabular-nums text-ink md:text-[17px]">
+                    <span data-pfd="wind-speed">CALM</span>
+                    <span className="ml-1 text-[10px] text-dim">KT</span>
+                  </span>
+                  <span data-pfd="wind-from" className="text-[10px] tabular-nums text-dim" />
+                </div>
+              </div>
+
+              {/* Level intro */}
+              <div
+                data-pfd="intro"
+                data-on="false"
+                className="pointer-events-none absolute inset-x-0 top-[22%] z-10 flex flex-col items-center gap-2 px-4 text-center opacity-0 transition-[opacity,transform] duration-300 data-[on=false]:-translate-y-2 data-[on=true]:opacity-100"
+              >
+                <span data-pfd="intro-level" className="font-mono text-[12px] font-bold tracking-[.2em] text-cyan [text-shadow:0_1px_8px_rgba(0,0,0,.8)] md:text-sm" />
+                <span data-pfd="intro-name" className="font-display text-[34px] font-bold leading-none tracking-[-.03em] text-white [text-shadow:0_2px_18px_rgba(0,0,0,.7)] md:text-[56px]" />
+                <div data-pfd="intro-chips" className="mt-1 flex flex-wrap justify-center gap-1.5 font-mono text-[10px] tracking-[.08em] text-white backdrop-blur-sm md:text-[12px]" />
+              </div>
+
               {/* Annunciations: amber is caution, red is warning */}
               <div className="pointer-events-none absolute left-1/2 top-[29%] flex -translate-x-1/2 flex-col items-center gap-1.5 font-mono text-[13px] font-bold tracking-[.14em] md:text-base">
                 <div data-pfd="ann-terrain" data-on="false" className="pfd-ann bg-red text-black">
@@ -874,7 +952,7 @@ export function Pfd() {
                 />
                 <span data-pfd="card-sub" className="max-w-[360px] text-[13px] leading-snug text-soft md:text-[15px]" />
                 <div data-pfd="card-stats" className="grid w-full grid-cols-3 gap-x-2 gap-y-2.5 border-t border-white/10 pt-3 font-mono empty:hidden" />
-                <span data-pfd="card-hint" className="font-mono text-[10px] tracking-[.1em] text-amber empty:hidden" />
+                <span data-pfd="card-hint" data-tone="amber" className="font-mono text-[10px] tracking-[.1em] text-amber empty:hidden data-[tone=magenta]:text-magenta" />
                 <div className="mt-1 flex w-full gap-2">
                   <button type="button" data-pfd="card-submit" data-action="submit" hidden className="btn btn-primary btn-sm flex-1 !text-[13px]">
                     Enter leaderboard
@@ -922,12 +1000,12 @@ export function Pfd() {
 
       <div className="mt-5 flex flex-col items-center gap-2 text-center font-mono text-[11px] tracking-[.1em] text-dim md:text-[12px]">
         <p className="hidden md:block">
-          <span className="text-ink">R</span> SCORED RUN · <span className="text-ink">MOUSE</span> YOKE · <span className="text-ink">W/S</span> POWER ·{" "}
+          <span className="text-ink">R</span> NEW RUN · <span className="text-ink">MOUSE</span> YOKE · <span className="text-ink">W/S</span> POWER ·{" "}
           <span className="text-ink">F/V</span> FLAPS · <span className="text-ink">A</span> AUTOPILOT
         </p>
         <p className="md:hidden">TAP FLY · DRAG TO STEER · BUTTONS FOR POWER &amp; FLAPS</p>
         <p className="max-w-[640px] text-[10px] leading-relaxed md:text-[11px]">
-          PRESS R ON THE RUNWAY AND HAND-FLY THE WHOLE LAP. THREAD THE GATES, FIGHT THE CROSSWIND, AND LAND AS CLOSE TO THE THRESHOLD AS YOU DARE: UNDER {MAX_TOUCHDOWN_KT} KT, GENTLE, WINGS LEVEL. LAND SHORT AND THE RUN IS OVER.
+          TEN LANDINGS IN A ROW. THE RINGS SHRINK, THE WIND BUILDS AND THE LAND-BY LINE CREEPS TOWARD YOU. MISS A RING, LAND PAST THE LINE OR BREAK A LIMIT AND IT&apos;S BACK TO LEVEL 1.
         </p>
       </div>
     </div>

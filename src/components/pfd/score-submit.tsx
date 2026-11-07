@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useImperativeHandle, useState, type RefObject } from "react";
-import type { Result } from "./flight-model";
+import type { RunResult } from "./flight-model";
 
-export type SubmitPayload = { result: Result; replay: string };
+export type SubmitPayload = { result: RunResult; replay: string };
 export type SubmitApi = { open: (payload: SubmitPayload) => void };
 
 type Board = {
@@ -121,7 +121,7 @@ export function ScoreSubmit({
             <span className="font-mono text-[10px] tracking-[.16em] text-dim">{contest ? contest.title.toUpperCase() : "LEADERBOARD"}</span>
             <span className="font-display text-[40px] font-bold leading-none tracking-[-.03em] text-magenta tabular-nums">{score.toLocaleString()}</span>
             <span className="font-mono text-[11px] tracking-[.1em] text-soft">
-              {payload.result.rank} · {payload.result.distance.toLocaleString()} FT
+              {payload.result.complete ? "ALL 10 LEVELS" : `${payload.result.cleared} OF 10 LEVELS`}
             </span>
           </div>
           {wouldPlace && status.kind !== "done" ? (

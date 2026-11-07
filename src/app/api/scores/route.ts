@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 const CALLSIGN = /^[A-Za-z0-9 ._-]{2,16}$/;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const MAX_REPLAY_CHARS = 700_000;
+const MAX_REPLAY_CHARS = 1_500_000;
 
 function error(message: string, status = 422) {
   return NextResponse.json({ error: message }, { status });
@@ -35,8 +35,9 @@ export async function POST(request: NextRequest) {
     return error("That flight recording couldn't be read.");
   }
   const result = flight.result;
-  if (flight.phase !== "rollout" || !result) return error("That run didn't end in a landing.");
-  if (!result.ranked) return error("Only runs hand-flown from the takeoff roll count. Press R and fly the whole lap yourself.");
+  if ((flight.phase !== "failed" && flight.phase !== "complete") || !result) return error("That run didn't finish.");
+  if (!result.ranked) return error("Only runs you hand-fly from level 1 count. Press R and fly it yourself.");
+  if (result.score <= 0) return error("Land at least one level to get on the board.");
   // Browsers do floating-point math identically in practice; allow a sliver
   // of slack for engines that round transcendental functions differently.
   if (Math.abs(result.score - claimed) > Math.max(40, claimed * 0.02)) {
@@ -77,9 +78,8 @@ export async function POST(request: NextRequest) {
       email,
       marketing_opt_in: body.optIn === true,
       score: result.score,
-      breakdown: result.breakdown,
-      distance: result.distance,
-      sink: result.sink,
+      breakdown: result.levels,
+      level: result.cleared,
       replay: data,
       ip_hash: ipHash,
       updated_at: now,

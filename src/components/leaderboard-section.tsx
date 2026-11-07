@@ -29,7 +29,7 @@ export async function LeaderboardSection() {
           )}
         </div>
         <div className="reveal">
-          <LeaderboardTable entries={entries} empty="No scores yet. Hand-fly a lap above and be the first on the board." />
+          <LeaderboardTable entries={entries} empty="No scores yet. Press R on the flight display above and be the first on the board." />
         </div>
         <div className="flex flex-wrap items-center justify-between gap-4 text-[15px] text-mute">
           <span>

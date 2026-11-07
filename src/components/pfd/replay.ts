@@ -6,7 +6,7 @@
 // Inputs are quantized *before* the browser uses them, so the browser and
 // the server run exactly the same numbers.
 
-import { createFlight, step, type Controls, type FlightState } from "./flight-model";
+import { createRun, step, type Controls, type FlightState } from "./flight-model";
 
 export type Frame = {
   dt: number; // seconds, a multiple of 1/10000
@@ -17,7 +17,7 @@ export type Frame = {
 
 const BYTES_PER_FRAME = 7;
 const NO_STICK = -32768;
-export const MAX_FRAMES = 60_000; // ~8 minutes at 120 fps
+export const MAX_FRAMES = 150_000; // ~20 minutes at 120 fps
 
 const q = (v: number, scale: number) => Math.round(v * scale) / scale;
 const sign = (v: number) => (v > 0 ? 1 : v < 0 ? -1 : 0);
@@ -76,12 +76,12 @@ export function decode(data: string): Frame[] {
   return frames;
 }
 
-// Re-fly a run from brake release until it lands or fails.
+// Re-fly a whole run, level 1 onward, until it fails or all ten are done.
 export function replay(frames: Frame[]): FlightState {
-  const s = createFlight();
+  const s = createRun();
   for (const f of frames) {
     step(s, f.dt, toControls(f));
-    if (s.phase === "rollout" || s.phase === "landed" || s.phase === "failed") break;
+    if (s.phase === "failed" || s.phase === "complete") break;
   }
   return s;
 }

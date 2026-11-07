@@ -53,18 +53,16 @@ export default async function LeaderboardPage() {
           <div className="flex flex-col gap-3">
             <h2 className="font-display text-2xl font-semibold">How scoring works</h2>
             <ul className="flex flex-col gap-2 text-[15px] leading-relaxed text-mute">
-              <li><span className="text-ink">Gates:</span> 100 per gate, up to 50 more for threading it dead center.</li>
-              <li><span className="text-ink">Landing:</span> the closer to the threshold you touch down, the more you get. Land short and the run is over.</li>
-              <li><span className="text-ink">Touchdown:</span> softer is better.</li>
-              <li><span className="text-ink">Centerline:</span> points for touching down on it.</li>
-              <li><span className="text-ink">Time:</span> a bonus for a quicker lap.</li>
-              <li><span className="text-ink">Penalties:</span> time in a stall warning or over flap speed, and every missed gate.</li>
+              <li><span className="text-ink">A run is ten landings.</span> Each level&apos;s rings shrink, the wind builds and the land-by line moves closer.</li>
+              <li><span className="text-ink">Per level:</span> points for clearing it, up to 100 per ring for threading it dead center, touching down close to the threshold, a soft touchdown and the centerline.</li>
+              <li><span className="text-ink">Later levels count more:</span> level 10 is worth almost three times level 1.</li>
+              <li><span className="text-ink">Miss a ring, land past the line, or break a limit</span> (stall, overspeed, flap speed, too fast or too hard at touchdown) and the run is over. Your score is everything you landed before that.</li>
             </ul>
           </div>
           <div className="flex flex-col gap-3">
             <h2 className="font-display text-2xl font-semibold">Fair play</h2>
             <p className="text-[15px] leading-relaxed text-mute">
-              Only full laps you hand-fly from the takeoff roll count. Your browser records your control inputs and our server re-flies the run with the same
+              Only runs you hand-fly from level 1 count. Your browser records your control inputs and our server re-flies the run with the same
               physics to compute your score, so every score on this board was actually flown. One entry per email; your best counts.
             </p>
             <div className="flex flex-wrap gap-3 pt-2">

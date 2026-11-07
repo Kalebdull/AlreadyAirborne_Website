@@ -4,7 +4,8 @@
 
 import * as THREE from "three";
 import type { FlightState } from "./flight-model";
-import { fbm, FIELD, GATE_H, GATE_W, GATES, PAPI, RUNWAY, terrainHeight } from "./world";
+import { LEVELS } from "./levels";
+import { fbm, FIELD, PAPI, RUNWAY, terrainHeight, THRESHOLD_X } from "./world";
 
 // Vertical field of view chosen so 1° of pitch on the camera matches 1° on
 // the pitch ladder (2.6% of the display height per degree).
@@ -145,24 +146,6 @@ function softDiscTexture(stops: [number, string][]) {
   return texture;
 }
 
-function gateGeometry() {
-  const t = 16;
-  const shape = new THREE.Shape();
-  shape.moveTo(-GATE_W / 2, -GATE_H / 2);
-  shape.lineTo(GATE_W / 2, -GATE_H / 2);
-  shape.lineTo(GATE_W / 2, GATE_H / 2);
-  shape.lineTo(-GATE_W / 2, GATE_H / 2);
-  shape.closePath();
-  const hole = new THREE.Path();
-  hole.moveTo(-GATE_W / 2 + t, -GATE_H / 2 + t);
-  hole.lineTo(-GATE_W / 2 + t, GATE_H / 2 - t);
-  hole.lineTo(GATE_W / 2 - t, GATE_H / 2 - t);
-  hole.lineTo(GATE_W / 2 - t, -GATE_H / 2 + t);
-  hole.closePath();
-  shape.holes.push(hole);
-  return new THREE.ShapeGeometry(shape);
-}
-
 export function createScene(container: HTMLElement): SvtScene {
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance", logarithmicDepthBuffer: true });
   const coarse = window.matchMedia("(pointer: coarse)").matches;
@@ -275,22 +258,48 @@ export function createScene(container: HTMLElement): SvtScene {
   runway.position.set((RUNWAY.east + RUNWAY.west) / 2, FIELD + 0.5, 0);
   scene.add(runway);
 
-  // Gates: magenta pathway boxes, like Garmin's SVT pathways.
-  const gateGeo = gateGeometry();
-  const gates = GATES.map((g) => {
-    const material = new THREE.MeshBasicMaterial({ color: MAGENTA.clone(), transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false });
-    const mesh = new THREE.Mesh(gateGeo, material);
-    mesh.position.set(g.x, g.y, g.z);
-    mesh.lookAt(g.x + g.tx, g.y, g.z + g.tz);
-    mesh.renderOrder = 2;
-    // A faint, slightly larger copy reads as a glow.
-    const glowMaterial = new THREE.MeshBasicMaterial({ color: MAGENTA.clone(), transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false });
-    const glow = new THREE.Mesh(gateGeo, glowMaterial);
-    glow.scale.set(1.06, 1.09, 1);
-    mesh.add(glow);
-    scene.add(mesh);
-    return { mesh, material, glowMaterial };
-  });
+  // Rings: magenta hoops, rebuilt whenever the level changes.
+  type RingMesh = { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial; glowMaterial: THREE.MeshBasicMaterial };
+  const ringGroup = new THREE.Group();
+  scene.add(ringGroup);
+  let ringMeshes: RingMesh[] = [];
+  let builtLevel = -1;
+  function buildRings(levelIndex: number) {
+    ringGroup.traverse((obj) => {
+      const m = obj as THREE.Mesh;
+      if (m.geometry) m.geometry.dispose();
+      if (m.material) (m.material as THREE.Material).dispose();
+    });
+    ringGroup.clear();
+    ringMeshes = LEVELS[levelIndex].course.rings.map((r) => {
+      const tube = Math.max(5, r.radius * 0.07);
+      const material = new THREE.MeshBasicMaterial({ color: MAGENTA.clone(), transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false });
+      const mesh = new THREE.Mesh(new THREE.TorusGeometry(r.radius, tube, 12, 72), material);
+      mesh.position.set(r.x, r.y, r.z);
+      mesh.lookAt(r.x + r.tx, r.y, r.z + r.tz);
+      mesh.renderOrder = 2;
+      // A faint, fatter copy reads as a glow.
+      const glowMaterial = new THREE.MeshBasicMaterial({ color: MAGENTA.clone(), transparent: true, opacity: 0.2, depthWrite: false, toneMapped: false });
+      mesh.add(new THREE.Mesh(new THREE.TorusGeometry(r.radius, tube * 2.6, 10, 72), glowMaterial));
+      ringGroup.add(mesh);
+      return { mesh, material, glowMaterial };
+    });
+    builtLevel = levelIndex;
+  }
+
+  // The "land by" line: a bright bar across the runway with posts at the edges.
+  const lineMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color("#ff3b6b"), toneMapped: false, polygonOffset: true, polygonOffsetFactor: -6 });
+  const landBy = new THREE.Group();
+  const bar = new THREE.Mesh(new THREE.PlaneGeometry(14, RUNWAY.width + 40), lineMaterial);
+  bar.rotation.x = -Math.PI / 2;
+  bar.position.y = 1;
+  landBy.add(bar);
+  for (const side of [-1, 1]) {
+    const post = new THREE.Mesh(new THREE.ConeGeometry(7, 26, 12), lineMaterial);
+    post.position.set(0, 13, side * (RUNWAY.width / 2 + 28));
+    landBy.add(post);
+  }
+  scene.add(landBy);
 
   function update(s: FlightState, view: { pitch: number; roll: number; camera: { x: number; y: number; z: number } }) {
     const d = Math.PI / 180;
@@ -306,27 +315,31 @@ export function createScene(container: HTMLElement): SvtScene {
       material.color.copy(glide > angle ? papiWhite : papiRed);
     });
 
-    gates.forEach(({ mesh, material, glowMaterial }, i) => {
-      const g = s.gates[i];
-      const age = s.time - g.at;
-      if (g.status === "pending") {
-        // Only show the pathway a few gates ahead, fading in with distance.
-        const ahead = i - s.nextGate;
-        mesh.visible = ahead >= 0 && ahead < 5;
+    if (s.levelIndex !== builtLevel) buildRings(s.levelIndex);
+    landBy.position.set(THRESHOLD_X + LEVELS[s.levelIndex].landBy, FIELD, 0);
+
+    ringMeshes.forEach(({ mesh, material, glowMaterial }, i) => {
+      const r = s.rings[i];
+      if (!r) return;
+      const age = s.time - r.at;
+      if (r.status === "pending") {
+        // Show the next few rings, the nearest brightest.
+        const ahead = i - s.nextRing;
+        mesh.visible = ahead >= 0 && ahead < 4;
         material.color.copy(MAGENTA);
-        material.opacity = ahead === 0 ? 0.95 : 0.95 - ahead * 0.14;
+        material.opacity = ahead === 0 ? 0.95 : 0.8 - ahead * 0.15;
         glowMaterial.color.copy(MAGENTA);
-        glowMaterial.opacity = ahead === 0 ? 0.28 : 0.12;
+        glowMaterial.opacity = ahead === 0 ? 0.24 : 0.1;
         mesh.scale.setScalar(1);
       } else {
-        // Passed gates flash green and expand away; missed ones blink amber.
+        // Passed rings flash green and expand away; a missed one turns amber.
         const t = Math.min(1, age / 0.7);
-        mesh.visible = t < 1;
-        material.color.copy(g.status === "passed" ? GREEN : AMBER);
-        material.opacity = 0.95 * (1 - t);
+        mesh.visible = r.status === "missed" || t < 1;
+        material.color.copy(r.status === "passed" ? GREEN : AMBER);
+        material.opacity = r.status === "missed" ? 0.95 : 0.95 * (1 - t);
         glowMaterial.color.copy(material.color);
-        glowMaterial.opacity = 0.4 * (1 - t);
-        mesh.scale.setScalar(1 + t * 0.5);
+        glowMaterial.opacity = r.status === "missed" ? 0.3 : 0.4 * (1 - t);
+        mesh.scale.setScalar(r.status === "passed" ? 1 + t * 0.4 : 1);
       }
     });
 

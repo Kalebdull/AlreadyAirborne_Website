@@ -14,8 +14,7 @@ type ScoreRow = {
   email: string;
   marketing_opt_in: boolean;
   score: number;
-  distance: number | null;
-  sink: number | null;
+  level: number;
   updated_at: string;
 };
 
@@ -31,7 +30,7 @@ export default async function AdminContestPage({ searchParams }: PageProps<"/adm
   const { data: scores } = selected
     ? await supabase
         .from("scores")
-        .select("id, callsign, email, marketing_opt_in, score, distance, sink, updated_at")
+        .select("id, callsign, email, marketing_opt_in, score, level, updated_at")
         .eq("contest_id", selected.id)
         .order("score", { ascending: false })
         .order("updated_at", { ascending: true })
@@ -88,8 +87,7 @@ export default async function AdminContestPage({ searchParams }: PageProps<"/adm
                     <th className="px-4 py-3">Callsign</th>
                     <th className="px-4 py-3">Email</th>
                     <th className="px-4 py-3 text-right">Score</th>
-                    <th className="px-4 py-3 text-right">Distance</th>
-                    <th className="px-4 py-3 text-right">Sink</th>
+                    <th className="px-4 py-3 text-right">Levels</th>
                     <th className="px-4 py-3">When</th>
                     <th className="px-4 py-3" />
                   </tr>
@@ -106,8 +104,7 @@ export default async function AdminContestPage({ searchParams }: PageProps<"/adm
                         {r.marketing_opt_in && <span className="ml-2 font-mono text-[10px] text-green">OPT-IN</span>}
                       </td>
                       <td className="px-4 py-3 text-right font-mono font-bold">{r.score.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right font-mono text-mute">{r.distance ?? "—"} ft</td>
-                      <td className="px-4 py-3 text-right font-mono text-mute">{r.sink ?? "—"}</td>
+                      <td className="px-4 py-3 text-right font-mono text-mute">{r.level}/10</td>
                       <td className="px-4 py-3 text-mute">
                         <LocalTime iso={r.updated_at} />
                       </td>

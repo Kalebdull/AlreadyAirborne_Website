@@ -1,4 +1,5 @@
--- Flight game leaderboard and contests.
+-- Flight game leaderboard and contests. A score is a whole run: ten
+-- landings, levels 1 to 10, added together.
 -- Scores are written only by the server (service role) after it re-flies
 -- the recorded run, so there is no insert policy for anyone else.
 
@@ -25,9 +26,8 @@ create table public.scores (
   email text not null check (char_length(email) <= 254 and email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
   marketing_opt_in boolean not null default false,
   score int not null check (score >= 0),
-  breakdown jsonb not null,
-  distance int,
-  sink int,
+  breakdown jsonb not null, -- per-level scores
+  level int not null default 1 check (level between 1 and 10), -- levels cleared
   replay text not null, -- the recorded inputs, kept for audit
   ip_hash text,
   created_at timestamptz not null default now(),
@@ -51,7 +51,7 @@ select
   s.contest_id,
   s.callsign,
   s.score,
-  s.distance,
+  s.level,
   s.updated_at,
   rank() over (partition by s.contest_id order by s.score desc, s.updated_at asc) as place
 from public.scores s;

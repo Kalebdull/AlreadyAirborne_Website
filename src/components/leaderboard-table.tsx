@@ -17,7 +17,7 @@ export function LeaderboardTable({ entries, empty }: { entries: Entry[]; empty: 
             {String(e.place).padStart(2, "0")}
           </span>
           <span className="truncate font-display text-lg font-semibold">{e.callsign}</span>
-          <span className="hidden text-right font-mono text-[13px] text-dim md:block">{e.distance !== null ? `${e.distance.toLocaleString()} FT` : ""}</span>
+          <span className="hidden text-right font-mono text-[13px] text-dim md:block">{e.level >= 10 ? "ALL 10" : `LVL ${e.level}`}</span>
           <span className="text-right font-mono text-lg font-bold tabular-nums">{e.score.toLocaleString()}</span>
         </li>
       ))}
