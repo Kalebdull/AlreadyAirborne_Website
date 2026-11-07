@@ -5,13 +5,17 @@ import { TOPICS } from "@/lib/topics";
 import { Pfd } from "@/components/pfd/pfd";
 import { RiseText } from "@/components/rise-text";
 import { Spotlight } from "@/components/spotlight";
-import { LeaderboardSection } from "@/components/leaderboard-section";
+import { GameSection } from "@/components/leaderboard-section";
 import { TopicMarquee } from "@/components/topic-marquee";
 import { Faq } from "@/components/faq";
+import { SectionHeader } from "@/components/section-header";
+import { LogoMark } from "@/components/logo";
+import { BulbIcon, ClipboardIcon, PlayIcon, VideoIcon } from "@/components/icons";
 
+// Section order follows the Prestige layout kit; colors, type and components
+// are this site's own (src/app/globals.css, design/README.md).
 export default async function Home() {
   const { topics, clips } = await getLibrary();
-  // Clip counts per topic slug, once the library has clips.
   const counts = new Map<string, number>();
   for (const t of topics) counts.set(t.slug, clips.filter((c) => c.topic_id === t.id).length);
 
@@ -19,195 +23,375 @@ export default async function Home() {
     <main>
       <Hero />
       <TopicMarquee />
-      <LeaderboardSection />
-      <Offers />
+      <StatBand />
+      <Mission />
+      <GameSection>
+        <div className="scroll-settle flex w-full justify-center">
+          <Pfd />
+        </div>
+      </GameSection>
+      <Pricing />
+      <HowItWorks />
       <Library counts={counts} hasLibrary={topics.length > 0} />
-      <About />
       <Faq />
       <Cta />
     </main>
   );
 }
 
+// --- 3. Hero: full-bleed image, content anchored bottom-left ------------------
+
+function ImageTreatment({ glow = true }: { glow?: boolean }) {
+  return (
+    <>
+      <div aria-hidden className="absolute inset-0 bg-[linear-gradient(110deg,rgba(0,0,0,.92)_0%,rgba(0,0,0,.6)_42%,rgba(0,0,0,.1)_100%)]" />
+      <div aria-hidden className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/70 to-transparent" />
+      <div aria-hidden className="grain" />
+      {glow && <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(34,211,238,.12)_0%,transparent_65%)]" />}
+    </>
+  );
+}
+
 function Hero() {
   return (
-    <section className="relative flex flex-col items-center gap-5 overflow-hidden px-4 pb-16 pt-20 text-center sm:px-6 md:pb-20 md:pt-28">
-      <a href={site.instagram.url} className="fade-up font-mono text-[13px] tracking-[.14em] text-magenta hover:text-ink">
-        ● NOW ON INSTAGRAM · @{site.instagram.handle.toUpperCase()}
-      </a>
-      <h1 className="headline text-[56px] leading-[.98] md:text-[104px]">
-        <RiseText text="Hard topics." delay={100} />
-        <br />
-        <RiseText text="Thirty seconds." delay={280} />
-      </h1>
-      <p className="fade-up max-w-[640px] text-xl font-medium leading-snug text-mute md:text-2xl" style={{ animationDelay: "550ms" }}>
-        Then go deeper, one-on-one, with a CFI who&apos;ll explain it until it clicks.
-      </p>
-      <div className="fade-up mt-2 flex flex-wrap items-center justify-center gap-4" style={{ animationDelay: "700ms" }}>
-        <Link href="/book" className="btn btn-primary">
-          Book a session
-        </Link>
-        <Link href="/library" className="link text-[17px] font-medium">
-          Watch the clips ›
-        </Link>
+    <section className="relative flex min-h-[620px] items-end overflow-hidden md:h-[92vh]">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/hero-approach.jpg"
+        alt="Synthetic-vision view down final approach: a magenta ring framing the runway, mountains beyond."
+        className="absolute inset-y-0 left-0 h-full w-full max-w-none object-cover object-[60%_50%] md:w-[145%] md:object-center"
+      />
+      <ImageTreatment />
+
+      <div className="absolute left-[clamp(1.25rem,4vw,4rem)] top-6 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[3px] text-soft">
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-magenta opacity-60 motion-reduce:animate-none" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-magenta" />
+        </span>
+        Now on Instagram · @{site.instagram.handle}
       </div>
 
-      <div id="fly" className="fade-up mt-14 flex w-full scroll-mt-20 justify-center md:mt-20" style={{ animationDelay: "850ms" }}>
-        <div className="scroll-settle flex w-full justify-center">
-          <Pfd />
+      <div className="relative w-full pb-20 pl-[clamp(1.25rem,4vw,4rem)] pr-6 pt-32 md:pb-24">
+        <div className="flex max-w-3xl flex-col items-start gap-6">
+          <span className="fade-up rounded-full bg-cyan/15 px-3.5 py-1.5 font-mono text-[11px] tracking-[.14em] text-cyan ring-1 ring-cyan/30">
+            FLIGHT INSTRUCTION · {site.instructor.location.toUpperCase()} &amp; ZOOM
+          </span>
+          <div className="flex items-start gap-5">
+            <span className="fade-up mt-2 hidden h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-black/60 shadow-[0_12px_40px_rgba(0,0,0,.65)] ring-1 ring-white/10 backdrop-blur md:flex">
+              <LogoMark size={34} />
+            </span>
+            <h1 className="headline text-[clamp(3.25rem,8vw,5.5rem)] leading-[1.02]">
+              <span className="block">
+                <RiseText text="Hard topics." delay={130} />
+              </span>
+              <span className="block">
+                <RiseText text="Thirty seconds." delay={230} />
+              </span>
+              <span className="block text-dim">
+                <RiseText text="Then it clicks." delay={330} />
+              </span>
+            </h1>
+          </div>
+          <p className="fade-up max-w-xl text-lg leading-relaxed text-soft md:text-xl" style={{ animationDelay: "440ms" }}>
+            Short explainers on the topics student pilots struggle with, then one-on-one on Zoom with {site.instructor.name}, CFI, until it makes sense.
+          </p>
+          <div className="fade-up flex flex-wrap gap-3" style={{ animationDelay: "560ms" }}>
+            <Link href="/book" className="btn btn-primary">
+              Book a session
+            </Link>
+            <a href="#fly" className="btn btn-ghost !border-white/35">
+              Fly the landing game
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <a
+        href="#stats"
+        className="press absolute bottom-6 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-2 font-mono text-[10px] tracking-[3px] text-dim hover:text-ink md:flex"
+        aria-label="Scroll down"
+      >
+        SCROLL
+        <span className="h-8 w-px overflow-hidden bg-white/10">
+          <span className="scroll-cue block h-full w-full bg-cyan" />
+        </span>
+      </a>
+    </section>
+  );
+}
+
+// --- 5. Stat band ---------------------------------------------------------------
+
+function StatBand() {
+  const stats = [
+    { value: "30s", label: "Per clip", sub: "Hard topics, short and visual", color: "text-cyan", bar: "bg-cyan" },
+    { value: "$50", label: "Per hour", sub: "1-on-1 on Zoom", color: "text-green", bar: "bg-green" },
+    { value: "$175", label: "Mock oral", sub: "Private or Commercial", color: "text-magenta", bar: "bg-magenta" },
+    { value: "10", label: "Levels", sub: "Landings in the flight game", color: "text-amber", bar: "bg-amber" },
+  ];
+  return (
+    <section id="stats" className="bg-[linear-gradient(135deg,#04161b,#050608)] px-6">
+      <div className="reveal-stagger mx-auto grid max-w-[1180px] grid-cols-2 md:grid-cols-4">
+        {stats.map((s, i) => (
+          <div
+            key={s.label}
+            className={`flex flex-col gap-3 border-white/[.07] px-2 py-12 md:px-8 md:py-14 ${i % 2 === 1 ? "border-l" : ""} ${i > 0 ? "md:border-l" : ""} ${i > 1 ? "border-t md:border-t-0" : ""}`}
+          >
+            <span aria-hidden className={`h-[3px] w-8 rounded-full ${s.bar}`} />
+            <span className={`headline text-[52px] tracking-[-.04em] md:text-[68px] ${s.color}`}>{s.value}</span>
+            <span className="font-mono text-[11px] uppercase tracking-[.16em] text-ink">{s.label}</span>
+            <span className="text-[14px] text-dim">{s.sub}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// --- 6. Mission: centered header, pillar cards, then the instructor -------------
+
+function Mission() {
+  const pillars = [
+    { title: "Relatable ideas", body: "Every topic gets an everyday comparison, so it sticks after the lesson ends.", color: "var(--color-cyan)", text: "text-cyan", Icon: BulbIcon },
+    { title: "Short and visual", body: "Thirty-second clips you can rewatch the night before a lesson or checkride.", color: "var(--color-magenta)", text: "text-magenta", Icon: PlayIcon },
+    { title: "One-on-one", body: "On Zoom, at your pace, on exactly what you're stuck on.", color: "var(--color-green)", text: "text-green", Icon: VideoIcon },
+    { title: "Checkride ready", body: "Mock orals built on the ACS, with a debrief on where you're weak.", color: "var(--color-amber)", text: "text-amber", Icon: ClipboardIcon },
+  ];
+  const { instructor } = site;
+  return (
+    <section id="about" className="scroll-mt-20 px-6 py-20 md:py-24">
+      <div className="mx-auto flex max-w-[1180px] flex-col gap-12">
+        <SectionHeader
+          eyebrow="Why I teach this way"
+          rule
+          title={
+            <>
+              Find the idea <span className="text-dim">that makes it click.</span>
+            </>
+          }
+          intro="I started making these videos to get better at teaching: every one is me hunting for the relatable idea that makes a hard topic land. Sessions work the same way."
+        />
+
+        <div className="reveal-stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {pillars.map(({ title, body, color, text, Icon }) => (
+            <div
+              key={title}
+              className="accent-bar relative flex flex-col gap-4 rounded-3xl bg-card p-7 ring-1 ring-white/5"
+              style={{ ["--bar" as string]: color }}
+            >
+              <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 ${text}`}>
+                <Icon className="h-5 w-5" />
+              </span>
+              <span className="font-display text-xl font-semibold tracking-[-.01em]">{title}</span>
+              <span className="text-[15px] leading-relaxed text-mute">{body}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="card reveal flex flex-col overflow-hidden md:flex-row">
+          <div className="relative flex aspect-[4/5] overflow-hidden bg-raised md:aspect-auto md:min-h-[520px] md:basis-[44%]">
+            {instructor.photo && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={instructor.photo} alt={instructor.photoAlt} className="absolute inset-0 h-full w-full object-cover object-[60%_35%]" />
+            )}
+            <div aria-hidden className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent" />
+            <div aria-hidden className="grain" />
+          </div>
+          <div className="flex flex-1 flex-col justify-center gap-5 p-8 md:p-14">
+            <span className="eyebrow">Your instructor</span>
+            <h2 className="headline text-[40px] md:text-[52px]">{instructor.name}</h2>
+            <div className="flex flex-wrap gap-2 font-mono text-xs">
+              {instructor.ratings.map((r, i) => (
+                <span key={r} className={`rounded-full border px-3 py-1 ${i === 0 ? "border-green/50 text-green" : "border-edge text-soft"}`}>
+                  {r.toUpperCase()}
+                </span>
+              ))}
+              <span className="rounded-full border border-edge px-3 py-1 text-soft">{instructor.location.toUpperCase()}</span>
+            </div>
+            <p className="text-lg leading-relaxed text-mute">{instructor.bio}</p>
+            <div className="flex flex-wrap items-center gap-5 pt-1">
+              <Link href="/book" className="btn btn-primary btn-sm">
+                Book a session
+              </Link>
+              <a href={site.instagram.url} className="link press text-[15px]">
+                Follow @{site.instagram.handle} ›
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </section>
   );
 }
 
-function Offers() {
+// --- 8. Pricing: three cards, featured middle -----------------------------------
+
+function Pricing() {
   return (
     <section id="sessions" className="scroll-mt-20 border-t border-line bg-[#050506] px-6 py-20 md:py-24">
-      <div className="mx-auto flex max-w-[1180px] flex-col gap-10">
-        <div className="reveal flex flex-wrap items-end justify-between gap-6">
-          <div className="flex flex-col gap-3">
-            <span className="eyebrow text-cyan">Work with me</span>
-            <h2 className="headline text-[40px] md:text-[56px]">Two ways to go deeper.</h2>
-          </div>
-          <p className="max-w-[420px] text-[17px] leading-relaxed text-mute">
-            Request a time. I confirm, send the Zoom link, and you pay after it&apos;s confirmed. Nothing up front.
-          </p>
-        </div>
-
-        <div className="reveal-stagger grid gap-4 md:grid-cols-2">
-          <OfferCard
-            eyebrow="Session · Zoom"
-            eyebrowClass="text-cyan"
+      <div className="mx-auto flex max-w-[1180px] flex-col gap-14">
+        <SectionHeader
+          eyebrow="Work with me"
+          title={
+            <>
+              Three ways <span className="text-dim">to learn it.</span>
+            </>
+          }
+          intro="Start free with the clips. When something won't click, book an hour. Before your checkride, run a mock oral. You pay after I confirm."
+        />
+        <div className="reveal-stagger grid items-center gap-6 md:grid-cols-3">
+          <PriceCard
+            tag="Free · with an account"
+            title="Clip Library"
+            description="Every reel, organized by topic, with your progress saved."
+            price="$0"
+            sub="always"
+            items={["Airspace, weather, regs and more", "Instrument 101 series", "Track what you've watched"]}
+            cta={{ href: "/signup?next=/library", label: "Create free account" }}
+            note="No card, no catch."
+          />
+          <PriceCard
+            featured
+            tag="Session · Zoom"
             title="1-on-1 Tutoring"
+            description="Any topic you're stuck on, worked through together until it makes sense."
             price="$50"
-            per="per hour"
-            items={[
-              "Any topic you're stuck on: airspace, weather, regs, IFR",
-              "Screen-shared charts, diagrams and real scenarios",
-              "Book one hour or up to two in a row",
-            ]}
-            cta={
-              <Link href="/book?service=zoom" className="btn btn-primary">
-                Request a time
-              </Link>
-            }
+            sub="per hour"
+            items={["Screen-shared charts and diagrams", "Real scenarios, not just definitions", "1, 1.5 or 2 hours"]}
+            cta={{ href: "/book?service=zoom", label: "Request a time" }}
+            note="Pay after I confirm."
           />
-          <OfferCard
+          <PriceCard
             id="oral"
-            eyebrow="Checkride prep"
-            eyebrowClass="text-magenta"
+            tag="Checkride prep"
             title="Mock Oral Exam"
+            description="A two-hour mock oral run like the real thing, then a debrief."
             price="$175"
-            per="per exam"
-            highlight
-            items={["Private Pilot or Commercial Pilot", "Run like the real checkride, built on the ACS", "Debrief on exactly where you're weak"]}
-            cta={
-              <Link href="/book?service=oral_ppl" className="btn btn-ghost !border-magenta">
-                Schedule a mock oral
-              </Link>
-            }
+            sub="per exam"
+            items={["Private Pilot or Commercial", "Built on the ACS", "Debrief on where you're weak"]}
+            cta={{ href: "/book?service=oral_ppl", label: "Schedule a mock oral" }}
+            note="Pay after I confirm."
           />
-        </div>
-
-        {/* How it works, drawn like a flight plan: three legs, one route. */}
-        <div className="relative">
-          <div aria-hidden className="absolute left-[16%] right-[16%] top-[54px] hidden h-px bg-gradient-to-r from-amber via-green to-cyan opacity-40 md:block" />
-          <ol className="reveal-stagger relative grid gap-4 md:grid-cols-3">
-          <Step n="01" tone="amber" tag="Request" title="Pick a time.">
-            Choose a session or mock oral and an open slot. Tell me what you&apos;re stuck on.
-          </Step>
-          <Step n="02" tone="green" tag="Cleared" title="I confirm it.">
-            Your dashboard shows the Zoom link and how to pay.
-          </Step>
-          <Step n="03" tone="cyan" tag="Join" title="Hop on Zoom.">
-            The link is one tap away when it&apos;s time. Bring your questions.
-          </Step>
-          </ol>
         </div>
       </div>
     </section>
   );
 }
 
-function OfferCard(props: {
+function PriceCard(props: {
   id?: string;
-  eyebrow: string;
-  eyebrowClass: string;
+  tag: string;
   title: string;
+  description: string;
   price: string;
-  per: string;
+  sub: string;
   items: string[];
-  cta: React.ReactNode;
-  highlight?: boolean;
+  cta: { href: string; label: string };
+  note: string;
+  featured?: boolean;
 }) {
   return (
     <Spotlight
       id={props.id}
-      tint={props.highlight ? "240 72 200" : "34 211 238"}
-      className={`card flex scroll-mt-24 flex-col gap-7 p-8 md:p-11 ${props.highlight ? "shadow-[inset_0_0_0_1px_rgba(240,72,200,.45)]" : ""}`}
+      tint="34 211 238"
+      className={`card-lift accent-bar relative flex scroll-mt-24 flex-col gap-6 rounded-[28px] p-8 md:p-9 ${
+        props.featured ? "bg-raised shadow-[inset_0_0_0_1px_rgba(34,211,238,.55)] md:scale-[1.02]" : "bg-card"
+      }`}
     >
-      <div className="flex flex-col gap-2.5">
-        <span className={`eyebrow ${props.eyebrowClass}`}>{props.eyebrow}</span>
-        <h3 className="font-display text-[34px] font-bold tracking-[-.02em] md:text-[40px]">{props.title}</h3>
+      {props.featured && (
+        <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-cyan px-4 py-1 font-mono text-[11px] font-bold tracking-[.12em] text-black">
+          START HERE
+        </span>
+      )}
+      <div className="flex flex-col gap-2">
+        <span className={`font-mono text-[11px] uppercase tracking-[.14em] ${props.featured ? "text-cyan" : "text-dim"}`}>{props.tag}</span>
+        <h3 className="font-display text-[28px] font-bold tracking-[-.01em]">{props.title}</h3>
+        <p className="text-[15px] leading-relaxed text-mute">{props.description}</p>
       </div>
       <div className="flex items-baseline gap-2">
-        <span className="headline text-[64px] md:text-[72px]">{props.price}</span>
-        <span className="text-[19px] text-mute">{props.per}</span>
+        <span className="headline text-[56px]">{props.price}</span>
+        <span className="text-[15px] text-mute">{props.sub}</span>
       </div>
-      <ul className="flex flex-col gap-3.5 text-[17px] text-soft">
+      <ul className="flex flex-col gap-3 text-[15px] text-soft">
         {props.items.map((item) => (
           <li key={item} className="flex gap-3">
-            <span className="font-mono text-green" aria-hidden>
+            <span className="font-mono text-cyan" aria-hidden>
               ✓
             </span>
             {item}
           </li>
         ))}
       </ul>
-      <div className="mt-auto">{props.cta}</div>
+      <div className="mt-auto flex flex-col gap-2">
+        <Link href={props.cta.href} className={`btn w-full !rounded-2xl ${props.featured ? "btn-primary" : "btn-ghost"}`}>
+          {props.cta.label}
+        </Link>
+        <span className="text-center text-[12px] text-dim">{props.note}</span>
+      </div>
     </Spotlight>
   );
 }
 
-function Step(props: { n: string; tone: "amber" | "green" | "cyan"; tag: string; title: string; children: React.ReactNode }) {
-  const color = { amber: "text-amber ring-amber/40", green: "text-green ring-green/40", cyan: "text-cyan ring-cyan/40" }[props.tone];
+// --- 9. Details: how it works, the library ---------------------------------------
+
+function HowItWorks() {
+  const steps = [
+    { n: "01", tag: "Request", title: "Pick a time.", body: "Choose a session or mock oral and an open slot. Tell me what you're stuck on.", color: "var(--color-amber)", text: "text-amber" },
+    { n: "02", tag: "Cleared", title: "I confirm it.", body: "Your dashboard shows the Zoom link and how to pay.", color: "var(--color-green)", text: "text-green" },
+    { n: "03", tag: "Join", title: "Hop on Zoom.", body: "The link is one tap away when it's time. Bring your questions.", color: "var(--color-cyan)", text: "text-cyan" },
+  ];
   return (
-    <li className="relative flex flex-col items-start gap-3 rounded-3xl bg-card p-7 md:items-center md:text-center">
-      <span className={`flex h-[54px] w-[54px] items-center justify-center rounded-full bg-black font-mono text-sm ring-1 ${color}`}>{props.n}</span>
-      <span className={`font-mono text-[12px] uppercase tracking-[.12em] ${color.split(" ")[0]}`}>{props.tag}</span>
-      <span className="font-display text-2xl font-semibold">{props.title}</span>
-      <span className="leading-normal text-mute">{props.children}</span>
-    </li>
+    <section className="border-t border-line bg-[#050506] px-6 pb-20 md:pb-24">
+      <div className="mx-auto flex max-w-[1180px] flex-col gap-12 pt-20 md:pt-24">
+        <SectionHeader
+          eyebrow="How it works"
+          title={
+            <>
+              Request, cleared, <span className="text-dim">join.</span>
+            </>
+          }
+        />
+        <ol className="reveal-stagger grid gap-4 md:grid-cols-3">
+          {steps.map((s) => (
+            <li key={s.n} className="accent-bar relative flex flex-col gap-3 rounded-3xl bg-card p-7" style={{ ["--bar" as string]: s.color }}>
+              <span className={`font-mono text-[12px] uppercase tracking-[.12em] ${s.text}`}>
+                {s.n} · {s.tag}
+              </span>
+              <span className="font-display text-2xl font-semibold">{s.title}</span>
+              <span className="leading-relaxed text-mute">{s.body}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
   );
 }
 
 function Library({ counts, hasLibrary }: { counts: Map<string, number>; hasLibrary: boolean }) {
   const label = (slug: string) => {
-    if (!hasLibrary) return "COMING SOON";
-    const n = counts.get(slug) ?? 0;
+    const n = hasLibrary ? (counts.get(slug) ?? 0) : 0;
     return n ? `${n} ${n === 1 ? "CLIP" : "CLIPS"}` : "COMING SOON";
   };
   const [featured, ...rest] = TOPICS;
   return (
     <section id="library" className="scroll-mt-20 px-6 py-20 md:py-24">
-      <div className="mx-auto flex max-w-[1180px] flex-col gap-10">
-        <div className="reveal flex flex-wrap items-end justify-between gap-6">
-          <div className="flex flex-col gap-3">
-            <span className="eyebrow">The library</span>
-            <h2 className="headline text-[40px] md:text-[56px]">
-              Every reel, organized.
-              <br />
-              <span className="text-dim">Free with an account.</span>
-            </h2>
-          </div>
-          <Link href="/library" className="btn btn-ghost btn-sm">
-            Open the library
-          </Link>
-        </div>
+      <div className="mx-auto flex max-w-[1180px] flex-col gap-12">
+        <SectionHeader
+          eyebrow="The library"
+          title={
+            <>
+              Every reel, organized. <span className="text-dim">Free with an account.</span>
+            </>
+          }
+          intro="What each topic covers, so you can find the thing you're stuck on."
+        />
 
         <div className="reveal-stagger grid gap-4 md:grid-cols-3 md:grid-rows-2">
-          <Link href={`/library#${featured.slug}`} className="lift relative flex min-h-[320px] flex-col justify-between overflow-hidden rounded-[28px] bg-card p-8 md:row-span-2">
+          <Link
+            href={`/library#${featured.slug}`}
+            className="card-lift accent-bar relative flex min-h-[320px] flex-col justify-between overflow-hidden rounded-[28px] bg-card p-8 md:row-span-2"
+            style={{ ["--bar" as string]: "var(--color-magenta)" }}
+          >
             <div aria-hidden className="absolute -right-16 -top-16 h-64 w-64 rounded-full border-[14px] border-magenta/20" />
             <div aria-hidden className="absolute -right-4 -top-4 h-40 w-40 rounded-full border-[10px] border-magenta/35" />
             <span className="relative font-mono text-xs tracking-[.12em] text-magenta">● {label(featured.slug)}</span>
@@ -224,7 +408,7 @@ function Library({ counts, hasLibrary }: { counts: Map<string, number>; hasLibra
             </div>
           </Link>
           {rest.map((t) => (
-            <Link key={t.slug} href={`/library#${t.slug}`} className="lift flex flex-col gap-5 rounded-[28px] bg-card p-7">
+            <Link key={t.slug} href={`/library#${t.slug}`} className="card-lift accent-bar flex flex-col gap-5 rounded-[28px] bg-card p-7">
               <div className="flex items-baseline justify-between gap-3">
                 <span className="font-display text-[24px] font-semibold">{t.name}</span>
                 <span className="whitespace-nowrap font-mono text-[11px] text-cyan">{label(t.slug)}</span>
@@ -243,7 +427,7 @@ function Library({ counts, hasLibrary }: { counts: Map<string, number>; hasLibra
           ))}
           <a
             href={site.instagram.url}
-            className="lift flex flex-col justify-between gap-5 rounded-[28px] p-7 shadow-[inset_0_0_0_1px_rgba(34,211,238,.35)] md:col-span-2"
+            className="card-lift flex flex-col justify-between gap-5 rounded-[28px] p-7 shadow-[inset_0_0_0_1px_rgba(34,211,238,.35)] md:col-span-2"
           >
             <span className="font-mono text-[11px] tracking-[.12em] text-cyan">REQUEST A TOPIC</span>
             <div className="flex flex-wrap items-end justify-between gap-4">
@@ -257,66 +441,41 @@ function Library({ counts, hasLibrary }: { counts: Map<string, number>; hasLibra
   );
 }
 
-function About() {
-  const { instructor } = site;
-  return (
-    <section id="about" className="scroll-mt-20 border-y border-line bg-[#050506] px-6 py-20 md:py-24">
-      <div className="card reveal mx-auto flex max-w-[1180px] flex-col overflow-hidden md:flex-row">
-        <div className="flex aspect-[4/5] items-center justify-center overflow-hidden bg-raised md:aspect-auto md:min-h-[540px] md:basis-[44%]">
-          {instructor.photo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={instructor.photo} alt={instructor.photoAlt} className="h-full w-full object-cover object-[60%_35%]" />
-          ) : (
-            <span className="font-mono text-xs text-dim">[PHOTO OF YOU]</span>
-          )}
-        </div>
-        <div className="flex flex-1 flex-col justify-center gap-5 p-8 md:p-14">
-          <span className="eyebrow">Your instructor</span>
-          <h2 className="headline text-[40px] md:text-[52px]">{instructor.name}</h2>
-          <div className="flex flex-wrap gap-2 font-mono text-xs">
-            {instructor.ratings.map((r, i) => (
-              <span key={r} className={`rounded-full border px-3 py-1 ${i === 0 ? "border-green/50 text-green" : "border-edge text-soft"}`}>
-                {r.toUpperCase()}
-              </span>
-            ))}
-            <span className="rounded-full border border-edge px-3 py-1 text-soft">{instructor.location.toUpperCase()}</span>
-          </div>
-          <p className="text-lg leading-relaxed text-mute">{instructor.bio}</p>
-          <div className="flex flex-col gap-2 border-t border-line pt-5">
-            <span className="eyebrow">I can help with</span>
-            <p className="text-[15px] leading-relaxed text-soft">Airspace · Weather · Regulations · Instrument procedures · Aerodynamics · Checkride prep</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-5 pt-1">
-            <Link href="/book" className="btn btn-primary btn-sm">
-              Book a session
-            </Link>
-            <a href={site.instagram.url} className="link text-[15px]">
-              Follow @{site.instagram.handle} ›
-            </a>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
+// --- 10. CTA: faint image, gradients, grain, glow; lockup card -------------------
 
 function Cta() {
   return (
-    <section className="px-6 pb-20 md:pb-24">
-      <div className="card reveal relative mx-auto flex max-w-[1180px] flex-col items-start justify-between gap-8 overflow-hidden p-10 md:flex-row md:items-center md:p-14">
-        <div aria-hidden className="absolute -bottom-24 -right-10 h-72 w-72 rounded-full border-[16px] border-cyan/10" />
-        <div className="relative flex flex-col gap-3">
-          <span className="font-mono text-[13px] tracking-[.14em] text-green">● READY TO COPY</span>
-          <h2 className="headline text-[40px] md:text-[60px]">Request your clearance.</h2>
-          <p className="text-[17px] text-mute">Pick a time that works. You pay after I confirm.</p>
+    <section className="relative overflow-hidden border-t border-line bg-[#050608] px-6 py-24 md:py-28">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/hero-approach.jpg" alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover opacity-25" />
+      <ImageTreatment />
+      <div className="relative mx-auto grid max-w-5xl items-center gap-12 md:grid-cols-[1.3fr_1fr]">
+        <div className="reveal flex flex-col gap-5">
+          <span className="font-mono text-[12px] tracking-[.14em] text-green">● READY TO COPY</span>
+          <h2 className="headline text-[44px] md:text-[60px]">
+            Request your <span className="text-cyan">clearance.</span>
+          </h2>
+          <p className="text-[17px] leading-relaxed text-soft">Pick a time that works and tell me what you&apos;re stuck on. I&apos;ll confirm and send the Zoom link.</p>
+          <p className="text-[15px] text-dim">Nothing to pay until I confirm.</p>
+          <div className="flex flex-wrap gap-3 pt-2">
+            <Link href="/book" className="btn btn-primary">
+              Book a session
+            </Link>
+            <a href={site.instagram.url} className="btn btn-ghost !border-white/35">
+              Message on Instagram
+            </a>
+          </div>
         </div>
-        <div className="relative flex flex-wrap gap-3">
-          <Link href="/book" className="btn btn-primary">
-            Book a session
-          </Link>
-          <a href={site.instagram.url} className="btn btn-ghost">
-            Message on Instagram
-          </a>
+        <div className="reveal flex flex-col items-center gap-4 rounded-3xl bg-white/[.04] p-10 text-center ring-1 ring-white/[.09] backdrop-blur-md">
+          <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-black shadow-[0_12px_40px_rgba(0,0,0,.65)] ring-1 ring-white/10">
+            <LogoMark size={40} />
+          </span>
+          <span className="font-display text-2xl font-semibold">AlreadyAirborne</span>
+          <span className="font-mono text-[10px] tracking-[.2em] text-dim">HARD TOPICS · THIRTY SECONDS</span>
+          <span aria-hidden className="accent-rule" />
+          <span className="font-mono text-[11px] tracking-[.14em] text-soft">
+            {site.instructor.name.toUpperCase()}, CFI · {site.instructor.location.toUpperCase()}
+          </span>
         </div>
       </div>
     </section>

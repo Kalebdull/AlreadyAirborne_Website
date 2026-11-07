@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogoMark } from "@/components/logo";
+import { InstagramIcon, MailIcon } from "@/components/icons";
 import { site } from "@/lib/site";
 
 const COLUMNS: { title: string; links: [string, string][] }[] = [
@@ -10,45 +10,53 @@ const COLUMNS: { title: string; links: [string, string][] }[] = [
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-line bg-[#050506] px-6 pb-8 pt-14">
+    <footer className="border-t border-line bg-[#050608] px-6 py-16">
       <div className="mx-auto flex max-w-[1180px] flex-col gap-12">
-        <div className="grid gap-10 md:grid-cols-[1.4fr_repeat(3,1fr)]">
+        <div className="grid gap-10 md:grid-cols-[1.5fr_repeat(3,1fr)]">
           <div className="flex flex-col gap-4">
-            <Link href="/" className="flex items-center gap-2 text-ink">
-              <LogoMark />
-              <span className="font-display text-lg font-semibold">{site.name}</span>
-            </Link>
-            <p className="max-w-[300px] text-[14px] leading-relaxed text-mute">
-              Hard topics in thirty seconds, then one-on-one on Zoom with {site.instructor.name}, CFI · {site.instructor.location}.
+            <span className="font-display text-xl font-semibold">{site.name}</span>
+            <span className="font-mono text-[10px] tracking-[.2em] text-cyan">HARD TOPICS · THIRTY SECONDS</span>
+            <p className="max-w-[320px] text-[14px] leading-relaxed text-mute">
+              Short explainers, then one-on-one on Zoom with {site.instructor.name}, CFI · {site.instructor.location}.
             </p>
-            <div className="flex flex-wrap gap-x-5 gap-y-1 text-[14px]">
-              <a href={site.instagram.url} className="link">
-                @{site.instagram.handle}
+            <div className="flex gap-2">
+              <a
+                href={site.instagram.url}
+                aria-label="Instagram"
+                className="press flex h-10 w-10 items-center justify-center rounded-full bg-white/5 text-soft ring-1 ring-white/10 hover:bg-white/10 hover:text-ink"
+              >
+                <InstagramIcon className="h-[18px] w-[18px]" />
               </a>
-              <a href={`mailto:${site.email}`} className="link">
-                {site.email}
+              <a
+                href={`mailto:${site.email}`}
+                aria-label="Email"
+                className="press flex h-10 w-10 items-center justify-center rounded-full bg-white/5 text-soft ring-1 ring-white/10 hover:bg-white/10 hover:text-ink"
+              >
+                <MailIcon className="h-[18px] w-[18px]" />
               </a>
             </div>
           </div>
           {COLUMNS.map((col) => (
             <nav key={col.title} aria-label={col.title} className="flex flex-col gap-3 text-[14px]">
-              <span className="eyebrow">{col.title}</span>
+              <span className="font-mono text-[11px] uppercase tracking-[.16em] text-cyan">{col.title}</span>
               {col.links.map(([label, href]) => (
-                <Link key={href} href={href} className="text-soft hover:text-ink">
+                <Link key={href} href={href} className="footer-link press">
                   {label}
                 </Link>
               ))}
             </nav>
           ))}
         </div>
-        <div className="flex flex-wrap justify-between gap-4 border-t border-line pt-6 text-xs text-dim">
+        <div className="flex flex-wrap justify-between gap-4 border-t border-white/[.08] pt-6 text-xs text-dim">
           <span>
-            © {new Date().getFullYear()} {site.name}
+            © {new Date().getFullYear()} {site.name} · {site.email}
           </span>
-          <Link href="/leaderboard/rules" className="hover:text-ink">
-            Contest rules
-          </Link>
-          <span className="font-mono">SQUAWK 1200</span>
+          <div className="flex gap-5">
+            <Link href="/leaderboard/rules" className="press hover:text-ink">
+              Contest rules
+            </Link>
+            <span className="font-mono">SQUAWK 1200</span>
+          </div>
         </div>
       </div>
     </footer>

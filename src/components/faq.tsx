@@ -1,3 +1,5 @@
+import { SectionHeader } from "@/components/section-header";
+
 const QUESTIONS: [string, string][] = [
   ["Do I need to be in San Jose?", "No. Tutoring and mock orals happen on Zoom, so you can join from anywhere."],
   ["When do I pay?", "After I confirm your request. Your dashboard shows how to pay right next to the Zoom link, so you never pay for a time that didn't work out."],
@@ -12,19 +14,25 @@ const QUESTIONS: [string, string][] = [
 // Apple-style list: each question opens in place. No script needed.
 export function Faq() {
   return (
-    <section id="faq" className="scroll-mt-20 px-6 py-20 md:py-24">
-      <div className="mx-auto grid max-w-[1180px] gap-10 md:grid-cols-[1fr_1.6fr] md:gap-16">
-        <div className="reveal flex flex-col gap-3 md:sticky md:top-24 md:self-start">
-          <span className="eyebrow">Questions</span>
-          <h2 className="headline text-[40px] md:text-[52px]">Before you book.</h2>
-          <p className="text-[17px] text-mute">
-            Something else? <a href="mailto:alreadyairborne@gmail.com" className="link">Email me</a>.
-          </p>
-        </div>
-        <div className="reveal flex flex-col border-t border-line">
+    <section id="faq" className="scroll-mt-20 border-t border-line px-6 py-20 md:py-24">
+      <div className="mx-auto flex max-w-[1180px] flex-col gap-12">
+        <SectionHeader
+          eyebrow="Questions"
+          title={
+            <>
+              Before you <span className="text-dim">book.</span>
+            </>
+          }
+          intro={
+            <>
+              Something else? <a href="mailto:alreadyairborne@gmail.com" className="link">Email me</a>.
+            </>
+          }
+        />
+        <div className="reveal mx-auto flex w-full max-w-3xl flex-col border-t border-line">
           {QUESTIONS.map(([q, a]) => (
-            <details key={q} className="faq group border-b border-line">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-left font-display text-lg font-semibold md:text-xl [&::-webkit-details-marker]:hidden">
+            <details key={q} className="group border-b border-line">
+              <summary className="press flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-left font-display text-lg font-semibold hover:text-cyan md:text-xl [&::-webkit-details-marker]:hidden">
                 {q}
                 <span aria-hidden className="text-2xl font-light text-dim transition-transform duration-300 group-open:rotate-45">
                   +
