@@ -178,6 +178,51 @@ body {
     border-color: var(--color-cyan);
     box-shadow: 0 0 0 3px rgb(34 211 238 / 0.25);
   }
+  /* Flight display: on-screen keys and annunciator lights. */
+  .pfd-key {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: rgb(255 255 255 / 0.1);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background-color 0.15s, transform 0.1s;
+  }
+  .pfd-key:hover {
+    background: rgb(255 255 255 / 0.2);
+  }
+  .pfd-key:active {
+    transform: scale(0.92);
+  }
+  @media (min-width: 768px) {
+    .pfd-key {
+      width: 34px;
+      height: 34px;
+    }
+  }
+  .pfd-ann {
+    display: none;
+    border-radius: 6px;
+    padding: 3px 12px;
+    box-shadow: 0 4px 18px rgb(0 0 0 / 0.45);
+  }
+  .pfd-ann[data-on="true"] {
+    display: block;
+    animation: ann-flash 0.9s steps(2, jump-none) infinite;
+  }
+  @keyframes ann-flash {
+    50% {
+      opacity: 0.35;
+    }
+  }
+
   .option:disabled {
     background: #0a0a0b;
     color: #48484a;
@@ -364,6 +409,7 @@ html {
   .gauge-arc,
   .teletype,
   .page-enter,
+  .pfd-ann[data-on="true"],
   .scroll-settle {
     animation: none;
   }

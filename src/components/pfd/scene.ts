@@ -4,7 +4,7 @@
 
 import * as THREE from "three";
 import type { FlightState } from "./flight-model";
-import { fbm, FIELD, GATE_H, GATE_W, GATES, RUNWAY, terrainHeight } from "./world";
+import { fbm, FIELD, GATE_H, GATE_W, GATES, PAPI, RUNWAY, terrainHeight } from "./world";
 
 // Vertical field of view chosen so 1° of pitch on the camera matches 1° on
 // the pitch ladder (2.6% of the display height per degree).
@@ -55,6 +55,21 @@ function runwayTexture(maxAnisotropy: number) {
   }
   // Centerline dashes
   for (let x = 380; x < canvas.width - 380; x += 120) ctx.fillRect(x, canvas.height / 2 - 2, 70, 4);
+  // Touchdown zone (500, 1500, 2000 ft) and aiming point (1000 ft) markings,
+  // at both ends. 4096 px across 5200 ft of runway.
+  const pxPerFt = canvas.width / (RUNWAY.east - RUNWAY.west);
+  const mid = canvas.height / 2;
+  for (const flip of [false, true]) {
+    const at = (ft: number, len: number) => (flip ? canvas.width - (ft + len) * pxPerFt : ft * pxPerFt);
+    ctx.fillRect(at(1000, 150), mid - 44, 150 * pxPerFt, 18);
+    ctx.fillRect(at(1000, 150), mid + 26, 150 * pxPerFt, 18);
+    for (const [ft, bars] of [[500, 3], [1500, 2], [2000, 2]] as const) {
+      for (let b = 0; b < bars; b++) {
+        ctx.fillRect(at(ft, 75), mid - 50 + b * 9, 75 * pxPerFt, 5);
+        ctx.fillRect(at(ft, 75), mid + 45 - b * 9, 75 * pxPerFt, 5);
+      }
+    }
+  }
   // Runway numbers, oriented for the airplane landing toward them
   ctx.font = "bold 76px sans-serif";
   ctx.textAlign = "center";
@@ -73,6 +88,60 @@ function runwayTexture(maxAnisotropy: number) {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = maxAnisotropy;
+  return texture;
+}
+
+// Tileable ground detail: soft blotches and grain, multiplied over the
+// terrain colors. This is what gives you a sense of speed down low.
+function groundDetailTexture(maxAnisotropy: number) {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "rgb(232,232,232)";
+  ctx.fillRect(0, 0, size, size);
+  let seed = 7;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 520; i++) {
+    const x = rand() * size;
+    const y = rand() * size;
+    const r = 3 + rand() * 18;
+    const g = 190 + Math.floor(rand() * 65);
+    ctx.fillStyle = `rgba(${g},${g},${g},0.35)`;
+    for (const dx of [-size, 0, size]) {
+      for (const dy of [-size, 0, size]) {
+        ctx.beginPath();
+        ctx.ellipse(x + dx, y + dy, r, r * (0.4 + rand() * 0.6), rand() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+  const img = ctx.getImageData(0, 0, size, size);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (rand() - 0.5) * 18;
+    img.data[i] += n;
+    img.data[i + 1] += n;
+    img.data[i + 2] += n;
+  }
+  ctx.putImageData(img, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = maxAnisotropy;
+  return texture;
+}
+
+function softDiscTexture(stops: [number, string][]) {
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  for (const [at, color] of stops) g.addColorStop(at, color);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
 }
 
@@ -96,7 +165,8 @@ function gateGeometry() {
 
 export function createScene(container: HTMLElement): SvtScene {
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance", logarithmicDepthBuffer: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2));
   renderer.setClearColor(SKY_HORIZON);
   const canvas = renderer.domElement;
   canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
@@ -148,8 +218,52 @@ export function createScene(container: HTMLElement): SvtScene {
   }
   terrainGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   terrainGeo.computeVertexNormals();
-  const terrain = new THREE.Mesh(terrainGeo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  const detail = groundDetailTexture(renderer.capabilities.getMaxAnisotropy());
+  detail.repeat.set(SIZE / 700, SIZE / 700);
+  const terrain = new THREE.Mesh(terrainGeo, new THREE.MeshLambertMaterial({ vertexColors: true, map: detail }));
   scene.add(terrain);
+
+  // Clouds: soft billboards well above the pattern, for depth and parallax.
+  const cloudTex = softDiscTexture([
+    [0, "rgba(255,255,255,0.95)"],
+    [0.45, "rgba(255,255,255,0.55)"],
+    [1, "rgba(255,255,255,0)"],
+  ]);
+  const cloudMat = new THREE.SpriteMaterial({ map: cloudTex, transparent: true, depthWrite: false, opacity: 0.85 });
+  let cseed = 42;
+  const crand = () => ((cseed = (cseed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 46; i++) {
+    const angle = crand() * Math.PI * 2;
+    const dist = 6000 + crand() * 42000;
+    const cx = Math.cos(angle) * dist - 1500;
+    const cz = Math.sin(angle) * dist - 2400;
+    const puffs = 3 + Math.floor(crand() * 4);
+    for (let k = 0; k < puffs; k++) {
+      const sprite = new THREE.Sprite(cloudMat);
+      const w = 1800 + crand() * 3200;
+      sprite.scale.set(w, w * (0.35 + crand() * 0.2), 1);
+      sprite.position.set(cx + (crand() - 0.5) * 3000, FIELD + 3400 + crand() * 2200, cz + (crand() - 0.5) * 3000);
+      scene.add(sprite);
+    }
+  }
+
+  // PAPI lights: screen-sized glows so they read from miles out.
+  const papiTex = softDiscTexture([
+    [0, "rgba(255,255,255,1)"],
+    [0.25, "rgba(255,255,255,0.9)"],
+    [1, "rgba(255,255,255,0)"],
+  ]);
+  const papi = PAPI.angles.map((angle, i) => {
+    const material = new THREE.SpriteMaterial({ map: papiTex, color: 0xffffff, sizeAttenuation: false, depthWrite: false, fog: false, toneMapped: false });
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(0.024, 0.024, 1);
+    sprite.position.set(PAPI.x, FIELD + 4, PAPI.z - (PAPI.angles.length - 1 - i) * PAPI.spacing);
+    sprite.renderOrder = 3;
+    scene.add(sprite);
+    return { sprite, material, angle };
+  });
+  const papiWhite = new THREE.Color("#ffffff");
+  const papiRed = new THREE.Color("#ff2a2a");
 
   // Runway, slightly above the ground to avoid z-fighting.
   const runwayTex = runwayTexture(renderer.capabilities.getMaxAnisotropy());
@@ -169,8 +283,13 @@ export function createScene(container: HTMLElement): SvtScene {
     mesh.position.set(g.x, g.y, g.z);
     mesh.lookAt(g.x + g.tx, g.y, g.z + g.tz);
     mesh.renderOrder = 2;
+    // A faint, slightly larger copy reads as a glow.
+    const glowMaterial = new THREE.MeshBasicMaterial({ color: MAGENTA.clone(), transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false });
+    const glow = new THREE.Mesh(gateGeo, glowMaterial);
+    glow.scale.set(1.06, 1.09, 1);
+    mesh.add(glow);
     scene.add(mesh);
-    return { mesh, material };
+    return { mesh, material, glowMaterial };
   });
 
   function update(s: FlightState, view: { pitch: number; roll: number; camera: { x: number; y: number; z: number } }) {
@@ -179,7 +298,15 @@ export function createScene(container: HTMLElement): SvtScene {
     camera.rotation.set(view.pitch * d, -s.hdg * d, -view.roll * d);
     sky.position.copy(camera.position);
 
-    gates.forEach(({ mesh, material }, i) => {
+    // PAPI: white above each light's angle, red below.
+    const dx = PAPI.x - view.camera.x;
+    papi.forEach(({ sprite, material, angle }) => {
+      sprite.visible = dx > 200;
+      const glide = (Math.atan2(view.camera.y - (FIELD + 4), Math.max(dx, 1)) * 180) / Math.PI;
+      material.color.copy(glide > angle ? papiWhite : papiRed);
+    });
+
+    gates.forEach(({ mesh, material, glowMaterial }, i) => {
       const g = s.gates[i];
       const age = s.time - g.at;
       if (g.status === "pending") {
@@ -188,6 +315,8 @@ export function createScene(container: HTMLElement): SvtScene {
         mesh.visible = ahead >= 0 && ahead < 5;
         material.color.copy(MAGENTA);
         material.opacity = ahead === 0 ? 0.95 : 0.95 - ahead * 0.14;
+        glowMaterial.color.copy(MAGENTA);
+        glowMaterial.opacity = ahead === 0 ? 0.28 : 0.12;
         mesh.scale.setScalar(1);
       } else {
         // Passed gates flash green and expand away; missed ones blink amber.
@@ -195,6 +324,8 @@ export function createScene(container: HTMLElement): SvtScene {
         mesh.visible = t < 1;
         material.color.copy(g.status === "passed" ? GREEN : AMBER);
         material.opacity = 0.95 * (1 - t);
+        glowMaterial.color.copy(material.color);
+        glowMaterial.opacity = 0.4 * (1 - t);
         mesh.scale.setScalar(1 + t * 0.5);
       }
     });
@@ -217,6 +348,11 @@ export function createScene(container: HTMLElement): SvtScene {
       else mat?.dispose();
     });
     runwayTex.dispose();
+    detail.dispose();
+    cloudTex.dispose();
+    papiTex.dispose();
+    cloudMat.dispose();
+    papi.forEach(({ material }) => material.dispose());
     renderer.dispose();
     renderer.forceContextLoss();
     canvas.remove();

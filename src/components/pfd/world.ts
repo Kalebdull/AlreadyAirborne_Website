@@ -68,8 +68,10 @@ export function terrainHeight(x: number, z: number) {
   const mountainMask = smoothstep(15000, 42000, d);
   const ridge = 1 - Math.abs(fbm(x / 14000 + 3.1, z / 14000 - 1.7, 5) * 2 - 1);
   const mountains = mountainMask * ridge * ridge * 6200;
-  // Exactly field elevation near the runway, gently rolling farther out.
-  const nearAirport = smoothstep(1200, 4000, runwayDistance(x, z));
+  // Exactly field elevation near the runway and along the extended
+  // centerline (the approach and departure corridors), rolling farther out.
+  const corridor = x > -10000 && x < 8000 ? Math.abs(z) : Infinity;
+  const nearAirport = Math.min(smoothstep(1200, 4000, runwayDistance(x, z)), smoothstep(700, 2600, corridor));
   const rolling = Math.max(0, (fbm(x / 5200, z / 5200, 4) - 0.5) * 180 + 40) * nearAirport;
   return FIELD + rolling * (1 - mountainMask * 0.5) + mountains;
 }
@@ -78,19 +80,19 @@ export function terrainHeight(x: number, z: number) {
 
 // [x, z, height above field, target airspeed]
 const WAYPOINTS: [number, number, number, number][] = [
-  [-1500, 0, 0, 65],
-  [0, 0, 150, 75],
-  [3000, 0, 650, 85], // upwind
-  [5200, -1800, 800, 90], // crosswind
+  [-1500, 0, 0, 60],
+  [0, 0, 100, 68],
+  [3000, 0, 340, 72], // upwind: a 172 climbs at about 4–5°
+  [5200, -1800, 580, 78], // crosswind
   [3500, -4300, 800, 90], // turning downwind
-  [-1000, -4600, 800, 90], // downwind, abeam the numbers
-  [-6000, -4300, 750, 85],
-  [-8200, -2200, 560, 78], // base
-  [-6600, -150, 330, 72], // turning final
-  [-2500, 0, 45, 68], // over the threshold
-  [-1200, 0, 0, 60], // touchdown zone
+  [-1000, -4600, 800, 85], // downwind, abeam the numbers
+  [-6000, -4300, 750, 78],
+  [-8200, -2200, 560, 72], // base
+  [-6600, -150, 290, 66], // turning final, on a ~3° glidepath to the PAPI
+  [-2500, 0, 45, 62], // over the threshold
+  [-1200, 0, 0, 55], // touchdown zone
   [2200, 0, 0, 30], // rollout
-];
+]
 
 export type PathPoint = { x: number; z: number; agl: number; speed: number; s: number };
 
@@ -195,6 +197,13 @@ function buildGates(): Gate[] {
 }
 
 export const GATES = buildGates();
+
+// The landing threshold for runway 9 (the piano keys at the west end).
+export const THRESHOLD_X = RUNWAY.west;
+
+// PAPI: four lights left of the runway at the aiming point. Each shows
+// white above its angle and red below; two white and two red is on glidepath.
+export const PAPI = { x: THRESHOLD_X + 1100, z: -(RUNWAY.width / 2 + 60), spacing: 30, angles: [2.5, 2.83, 3.17, 3.5] };
 
 export function onRunway(x: number, z: number) {
   return x > RUNWAY.west && x < RUNWAY.east && Math.abs(z) < RUNWAY.width / 2 + 25;

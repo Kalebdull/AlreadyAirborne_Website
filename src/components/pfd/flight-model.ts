@@ -1,23 +1,38 @@
-// A deliberately simple flight model: just enough physics that the
-// instruments and the synthetic-vision view agree with each other the way
-// they do in a real airplane. Pitch drives climb, bank drives turn rate,
-// and the autopilot flies the magenta pathway around the traffic pattern
-// to a landing. Hover the display to take the controls.
+// The flight model behind the PFD game. Simple, but honest where it
+// matters for learning to fly:
 //
-// Physics runs in fixed 1/120 s substeps so it behaves identically at 30,
-// 60 or 120 fps, and never jumps after a slow frame.
+// - Energy: airspeed comes from power, drag and climb angle. Pull the nose
+//   up and you trade speed for altitude until the wing stalls.
+// - Angle of attack: the wing stalls at a fixed angle, so stall speed goes
+//   down with flaps and up with bank (load factor), like the real thing.
+// - Limits: stall, Vne, flap speeds and touchdown limits all end the run,
+//   each with a CFI tip.
+//
+// Physics runs in fixed 1/120 s substeps so it behaves identically at any
+// frame rate and never jumps after a slow frame.
 
-import { closestS, FIELD, GATE_H, GATE_W, GATES, onRunway, pathAt, RUNWAY, terrainHeight } from "./world";
+import { closestS, FIELD, GATE_H, GATE_W, GATES, onRunway, pathAt, RUNWAY, terrainHeight, THRESHOLD_X } from "./world";
 
-export type Phase = "takeoff" | "ap" | "manual" | "rollout" | "landed" | "crashed";
-export type Tone = "green" | "amber" | "red" | "cyan";
+export type Phase = "ap" | "manual" | "rollout" | "landed" | "failed";
+export type Tone = "green" | "amber" | "red" | "cyan" | "magenta";
 export type GateState = { status: "pending" | "passed" | "missed"; at: number };
+export type Failure = { title: string; tip: string };
+export type Result = {
+  distance: number; // touchdown point past the threshold, ft
+  sink: number; // ft/min at touchdown
+  speed: number; // kt at touchdown
+  gates: number;
+  rank: string;
+  ranked: boolean; // hand-flown all the way down final
+  newBest: boolean;
+};
 
 export type FlightState = {
   time: number; // real seconds
   simTime: number;
   phase: Phase;
   phaseTime: number; // real seconds in this phase
+  airborne: boolean;
   x: number;
   z: number;
   alt: number; // ft MSL
@@ -26,39 +41,104 @@ export type FlightState = {
   ias: number; // kt
   vs: number; // ft/min
   hdg: number; // deg
-  pathS: number; // progress along the pattern, ft
+  aoa: number; // deg
+  throttle: number; // 0..1, actual
+  throttleCmd: number;
+  flaps: number; // deg, actual
+  flapsCmd: number; // 0 | 10 | 20 | 30
+  simSpeed: number;
+  pathS: number;
+  rollTarget: number;
   altSel: number;
   hdgSel: number;
   speedTrend: number;
+  vfeTimer: number;
   gates: GateState[];
   nextGate: number;
   passed: number;
+  apOnFinal: boolean;
   toast: { text: string; tone: Tone; at: number } | null;
-  fade: number; // 0..1 black overlay for resets
+  failure: Failure | null;
+  result: Result | null;
+  best: number | null; // best ranked touchdown distance, ft
+  fade: number;
   fadingIn: boolean;
   resets: number;
 };
 
-export type Controls = { stick: { x: number; y: number } | null };
+export type Controls = {
+  stick: { x: number; y: number } | null; // -1..1, null = hands off
+  throttle: number; // -1, 0 or 1: power down / hold / up
+  flaps: number; // -1, 0 or 1: one notch up / down (edge-triggered)
+  retry: boolean;
+};
 
-// The sim runs faster than real time so a visitor sees a whole pattern in
-// about a minute rather than five.
-export const SIM_SPEED = 3.5;
+// --- Airplane numbers (Cessna 172-ish) ------------------------------------------
+export const FLAP_SETTINGS = [0, 10, 20, 30];
+const VS_BY_FLAPS = [48, 46, 43, 40]; // stall speed, wings level
+export const VFE_BY_FLAPS = [Infinity, 110, 85, 85]; // max flap extended speed
+const FLAP_DRAG = [1, 1.15, 1.45, 1.9];
+export const VNE = 163;
+export const VNO = 129;
+export const MAX_TOUCHDOWN_KT = 70;
+const MAX_TOUCHDOWN_SINK = -600;
+const AOA_CRIT = 16; // wing stalls here
+const AOA_WARN = 13; // stall horn
+const INCIDENCE = 3; // wing incidence: body pitch = flight path + AoA - 3°
+const G_K = 19.07; // gravity in kt/s
+const CD0 = 1.73e-4;
+const CI = 3702;
+
+export const SIM_SPEED_AP = 3.5; // demo: a whole pattern in about a minute
+export const SIM_SPEED_MANUAL = 2.2; // hand-flying: more time to react
 export const EYE_HEIGHT = 8;
 
-const ROTATE_KT = 55;
-const CRUISE_PITCH = 2.5;
 const STEP = 1 / 120;
 const deg = Math.PI / 180;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 export const angleDiff = (to: number, from: number) => ((to - from + 540) % 360) - 180;
 
+function byFlaps(table: number[], flaps: number) {
+  const i = clamp(flaps / 10, 0, 3);
+  const lo = Math.floor(i);
+  const hi = Math.min(3, lo + 1);
+  return table[lo] + (table[hi] - table[lo]) * (i - lo);
+}
+
+const thrustMax = (v: number) => 4.6 - 0.018 * v; // kt/s at full power
+const drag = (v: number, flaps: number) => CD0 * byFlaps(FLAP_DRAG, flaps) * v * v + CI / Math.max(v * v, 900);
+
+export function stallSpeed(flaps: number, roll: number) {
+  return byFlaps(VS_BY_FLAPS, flaps) / Math.sqrt(Math.max(Math.cos(roll * deg), 0.25));
+}
+
+function aoaFor(v: number, flaps: number, roll: number) {
+  return AOA_CRIT * (stallSpeed(flaps, roll) / Math.max(v, 1)) ** 2;
+}
+
+export function vfeFor(flaps: number) {
+  return flaps < 2 ? Infinity : VFE_BY_FLAPS[Math.min(3, Math.ceil(flaps / 10 - 0.05))];
+}
+
+// --- Ranking ---------------------------------------------------------------------
+export const RANKS: [number, string][] = [
+  [150, "ON THE NUMBERS"],
+  [400, "ACE"],
+  [800, "CHECKRIDE READY"],
+  [1500, "SOLID"],
+  [2500, "STUDENT PILOT"],
+  [Infinity, "FLOATED IT"],
+];
+const rankFor = (distance: number) => RANKS.find(([max]) => distance <= max)![1];
+
+// --- Lifecycle -------------------------------------------------------------------
 export function createFlight(reduced = false): FlightState {
-  const base: FlightState = {
+  const s: FlightState = {
     time: 0,
     simTime: 0,
-    phase: "takeoff",
+    phase: "ap",
     phaseTime: 0,
+    airborne: false,
     x: RUNWAY.west + 300,
     z: 0,
     alt: FIELD,
@@ -67,14 +147,26 @@ export function createFlight(reduced = false): FlightState {
     ias: 0,
     vs: 0,
     hdg: 90,
+    aoa: 0,
+    throttle: 1,
+    throttleCmd: 1,
+    flaps: 0,
+    flapsCmd: 0,
+    simSpeed: SIM_SPEED_AP,
     pathS: 0,
+    rollTarget: 0,
     altSel: FIELD + 800,
     hdgSel: 90,
     speedTrend: 0,
+    vfeTimer: 0,
     gates: GATES.map(() => ({ status: "pending" as const, at: 0 })),
     nextGate: 0,
     passed: 0,
+    apOnFinal: false,
     toast: null,
+    failure: null,
+    result: null,
+    best: null,
     fade: 0,
     fadingIn: false,
     resets: 0,
@@ -82,9 +174,9 @@ export function createFlight(reduced = false): FlightState {
   if (reduced) {
     // A still frame on downwind, with the pathway visible ahead.
     const p = pathAt(closestS(-1000, -4600).s);
-    Object.assign(base, { phase: "ap", x: p.x, z: p.z, alt: FIELD + p.agl, hdg: 270, ias: 90, pitch: CRUISE_PITCH, pathS: p.s, nextGate: 5 });
+    Object.assign(s, { airborne: true, x: p.x, z: p.z, alt: FIELD + p.agl, hdg: 270, ias: 85, pitch: 2, throttle: 0.6, pathS: p.s, nextGate: 5 });
   }
-  return base;
+  return s;
 }
 
 function setPhase(s: FlightState, phase: Phase) {
@@ -98,134 +190,156 @@ function toast(s: FlightState, text: string, tone: Tone) {
   s.toast = { text, tone, at: s.time };
 }
 
-function reset(s: FlightState) {
-  const keep = { time: s.time, simTime: s.simTime, resets: s.resets + 1 };
-  Object.assign(s, createFlight(), keep, { fade: 1, fadingIn: true });
+function fail(s: FlightState, title: string, tip: string) {
+  s.failure = { title, tip };
+  setPhase(s, "failed");
 }
 
-function landingGrade(vs: number) {
-  if (vs > -250) return "BUTTER.";
-  if (vs > -600) return "NICE LANDING.";
-  return "FIRM. WE'LL WORK ON IT.";
+function reset(s: FlightState) {
+  const keep = { time: s.time, simTime: s.simTime, resets: s.resets + 1, best: s.best };
+  Object.assign(s, createFlight(), keep, { fade: 1, fadingIn: true });
 }
 
 export function step(s: FlightState, dtReal: number, c: Controls) {
   s.time += dtReal;
   s.phaseTime += dtReal;
 
-  const dtSim = dtReal * SIM_SPEED;
-  const n = Math.min(60, Math.max(1, Math.ceil(dtSim / STEP)));
-  for (let i = 0; i < n; i++) physics(s, dtSim / n, c);
+  // Flaps move one notch per press, only when you're flying.
+  if (c.flaps && s.phase === "manual") {
+    const i = clamp(FLAP_SETTINGS.indexOf(s.flapsCmd) + c.flaps, 0, 3);
+    s.flapsCmd = FLAP_SETTINGS[i];
+  }
 
-  // Fades and resets run on real time so they feel the same at any sim speed.
+  // Ease the sim speed between demo pace and hand-flying pace.
+  const targetSpeed = s.phase === "manual" ? SIM_SPEED_MANUAL : SIM_SPEED_AP;
+  s.simSpeed += (targetSpeed - s.simSpeed) * Math.min(1, 2 * dtReal);
+
+  const dtSim = dtReal * s.simSpeed;
+  const n = Math.min(60, Math.max(1, Math.ceil(dtSim / STEP)));
+  for (let i = 0; i < n && s.phase !== "failed" && s.phase !== "landed"; i++) physics(s, dtSim / n, dtReal / n, c);
+
+  // Outcomes and resets run on real time.
   if (s.fadingIn) {
-    s.fade = Math.max(0, 1 - s.phaseTime / 0.5);
+    s.fade = Math.max(0, 1 - s.phaseTime / 0.45);
     if (s.fade === 0) s.fadingIn = false;
-  } else if (s.phase === "landed" || s.phase === "crashed") {
-    const hold = s.phase === "landed" ? 3.4 : 2.4;
-    s.fade = clamp((s.phaseTime - hold) / 0.45, 0, 1);
+  } else if (s.phase === "failed" || s.phase === "landed") {
+    const hold = s.phase === "landed" ? 4.5 : 3.2;
+    if (c.retry && s.phaseTime > 0.4) s.phaseTime = Math.max(s.phaseTime, hold);
+    s.fade = clamp((s.phaseTime - hold) / 0.35, 0, 1);
     if (s.fade >= 1) reset(s);
   } else {
     s.fade = 0;
   }
 }
 
-function physics(s: FlightState, h: number, c: Controls) {
+function physics(s: FlightState, h: number, hReal: number, c: Controls) {
   s.simTime += h;
   const ground = terrainHeight(s.x, s.z);
   const agl = s.alt - ground;
 
-  // --- Who's flying -------------------------------------------------------
-  if (c.stick && (s.phase === "ap" || (s.phase === "takeoff" && agl > 30))) {
+  // --- Who's flying -------------------------------------------------------------
+  if (c.stick && s.phase === "ap") {
     setPhase(s, "manual");
   } else if (!c.stick && s.phase === "manual") {
     setPhase(s, "ap");
-    s.pathS = closestS(s.x, s.z).s; // rejoin the pattern from wherever you are
-  } else if (s.phase === "takeoff" && agl > 50) {
-    setPhase(s, "ap");
-    s.pathS = closestS(s.x, s.z, 0).s;
-    toast(s, "AUTOPILOT · FOLLOWING THE PATHWAY", "cyan");
+    s.pathS = s.airborne ? closestS(s.x, s.z).s : 0; // rejoin the pattern
   }
 
   let rollTarget = 0;
-  let pitchTarget = CRUISE_PITCH;
-  let speedTarget = s.ias;
+  let pitchTarget = s.pitch;
 
-  if (s.phase === "takeoff") {
-    pitchTarget = s.ias > ROTATE_KT ? 8 : 0;
-  } else if (s.phase === "manual" && c.stick) {
-    rollTarget = c.stick.x * 35;
-    pitchTarget = CRUISE_PITCH - c.stick.y * 12;
-  } else if (s.phase === "ap") {
-    // Pure-pursuit guidance: aim at a point ~4 seconds ahead on the path.
-    s.pathS = closestS(s.x, s.z, s.pathS).s;
-    const here = pathAt(s.pathS);
-    const look = pathAt(s.pathS + clamp(s.ias * 1.688 * 4, 900, 2200));
-    const dx = look.x - s.x;
-    const dz = look.z - s.z;
-    const desiredHdg = ((Math.atan2(dx, -dz) / deg) % 360 + 360) % 360;
-    rollTarget = clamp(angleDiff(desiredHdg, s.hdg) * 1.3, -25, 25);
-    const targetAlt = FIELD + look.agl;
-    const fpa = clamp(Math.atan2(targetAlt - s.alt, Math.hypot(dx, dz)) / deg, -6, 8);
-    pitchTarget = CRUISE_PITCH + fpa / 0.95;
-    speedTarget = here.speed;
-    s.altSel = Math.round(targetAlt / 100) * 100;
-    s.hdgSel = desiredHdg;
-
-    // Flare over the runway: ease the nose up and bleed off speed.
-    if (agl < 25 && Math.abs(s.z) < 200 && s.x > RUNWAY.west - 1500) {
-      pitchTarget = 1.4;
-      speedTarget = 58;
-    }
-  } else if (s.phase === "rollout" || s.phase === "landed" || s.phase === "crashed") {
+  if (s.phase === "rollout") {
+    s.throttleCmd = 0;
     pitchTarget = 0;
-  }
-
-  const manual = s.phase === "manual";
-  s.roll += (rollTarget - s.roll) * Math.min(1, (manual ? 3 : 1.6) * h);
-  s.pitch += (pitchTarget - s.pitch) * Math.min(1, (manual ? 2.5 : 1.4) * h);
-
-  // --- Speed ----------------------------------------------------------------
-  const prevIas = s.ias;
-  const onGround = agl <= 0.5;
-  if (s.phase === "takeoff" && onGround) {
-    s.ias = Math.min(s.ias + 12 * h, ROTATE_KT + 10);
-  } else if (s.phase === "ap") {
-    s.ias += (speedTarget - s.ias) * 0.6 * h;
-  } else if (manual) {
-    s.ias += (clamp(95 - (s.pitch - CRUISE_PITCH) * 6, 55, 150) - s.ias) * 0.35 * h;
-  } else if (s.phase === "rollout") {
-    s.ias = Math.max(0, s.ias - 7 * h);
-    if (s.ias < 3) {
-      setPhase(s, "landed");
+  } else if (s.phase === "manual" && c.stick) {
+    s.throttleCmd = clamp(s.throttleCmd + c.throttle * 0.7 * hReal, 0, 1);
+    pitchTarget = 4 - c.stick.y * 16;
+    if (s.airborne) {
+      rollTarget = c.stick.x * 40;
+    } else {
+      // On the runway the nose only comes up once there's enough speed.
+      pitchTarget = s.ias < 45 ? 0 : clamp(pitchTarget, 0, 12);
     }
-  } else if (s.phase === "landed" || s.phase === "crashed") {
-    s.ias = Math.max(0, s.ias - 20 * h);
+  } else if (s.phase === "ap" && !s.airborne) {
+    // Takeoff: full power, rotate at 52 kt.
+    s.throttleCmd = 1;
+    s.flapsCmd = 0;
+    pitchTarget = s.ias > 52 ? 10 : 0;
+  } else if (s.phase === "ap") {
+    pitchTarget = autopilot(s, agl);
+    rollTarget = s.rollTarget;
   }
 
-  // --- Flight path ----------------------------------------------------------
-  const grounded = (s.phase === "takeoff" && s.ias < ROTATE_KT) || s.phase === "rollout" || s.phase === "landed" || s.phase === "crashed";
-  const fpa = grounded ? 0 : (s.pitch - CRUISE_PITCH) * 0.95;
+  // --- Controls and configuration ------------------------------------------------
+  const manual = s.phase === "manual";
+  s.roll += (rollTarget - s.roll) * Math.min(1, (manual ? 2.6 : 1.5) * h);
+  s.pitch += (pitchTarget - s.pitch) * Math.min(1, (manual ? 2.2 : 1.4) * h);
+  s.throttle += clamp(s.throttleCmd - s.throttle, -1.5 * h, 1.5 * h);
+  s.flaps += clamp(s.flapsCmd - s.flaps, -3.5 * h, 3.5 * h);
+  s.aoa = aoaFor(s.ias, s.flaps, s.airborne ? s.roll : 0);
+
+  // --- Energy -------------------------------------------------------------------
+  const prevIas = s.ias;
+  let fpa = 0;
+  if (s.airborne) {
+    fpa = clamp(s.pitch - (s.aoa - INCIDENCE), -25, 25);
+    const accel = s.throttle * thrustMax(s.ias) - drag(s.ias, s.flaps) - G_K * Math.sin(fpa * deg);
+    s.ias = Math.max(0, s.ias + accel * h);
+  } else {
+    const brakes = s.phase === "rollout" ? 4 : 0;
+    const accel = s.throttle * thrustMax(s.ias) - CD0 * s.ias * s.ias - 0.35 - brakes;
+    s.ias = Math.max(0, s.ias + accel * h);
+    // Lift-off when the wing is flying and the nose is up.
+    if ((s.phase === "ap" || s.phase === "manual") && s.pitch - (s.aoa - INCIDENCE) > 0.3 && s.ias > stallSpeed(s.flaps, 0) * 1.05) {
+      s.airborne = true;
+    }
+  }
+
   s.vs = s.ias * 101.27 * Math.sin(fpa * deg);
   s.alt += (s.vs / 60) * h;
 
-  if (grounded) {
-    s.hdg += angleDiff(RUNWAY.heading, s.hdg) * Math.min(1, 0.8 * h);
-    s.roll += -s.roll * Math.min(1, 3 * h);
+  if (s.airborne) {
+    s.hdg += ((1091 * Math.tan(s.roll * deg)) / Math.max(s.ias, 40)) * h;
   } else {
-    s.hdg += ((1091 * Math.tan(s.roll * deg)) / Math.max(s.ias, 50)) * h;
+    s.roll += -s.roll * Math.min(1, 3 * h);
+    s.hdg += angleDiff(RUNWAY.heading, s.hdg) * Math.min(1, 0.8 * h);
+    s.z += -s.z * Math.min(1, 0.3 * h); // stay on the centerline
   }
   s.hdg = ((s.hdg % 360) + 360) % 360;
 
   const gate = GATES[s.nextGate];
   const alongBefore = gate ? (s.x - gate.x) * gate.tx + (s.z - gate.z) * gate.tz : 0;
-
   const gs = s.ias * 1.68781 * Math.cos(fpa * deg);
   s.x += Math.sin(s.hdg * deg) * gs * h;
   s.z += -Math.cos(s.hdg * deg) * gs * h;
 
-  // --- Gates ----------------------------------------------------------------
-  if (gate && (s.phase === "ap" || s.phase === "manual" || s.phase === "takeoff")) {
+  const trend = h > 0 ? ((s.ias - prevIas) / h) * 6 : 0;
+  s.speedTrend += (trend - s.speedTrend) * Math.min(1, 3 * h);
+
+  if (!s.airborne) {
+    s.alt = terrainHeight(s.x, s.z);
+    if (s.phase === "rollout" && s.ias < 3) landed(s);
+    return;
+  }
+
+  // --- Limits -----------------------------------------------------------------
+  if (s.aoa >= AOA_CRIT) {
+    return fail(s, "STALL", "Too slow for the wing to fly. Lower the nose and add power the moment the STALL warning shows.");
+  }
+  if (s.ias > VNE) {
+    return fail(s, "OVERSPEED", "Past the red line (163 kt). Ease the nose up and pull the power back in a dive.");
+  }
+  if (s.ias > vfeFor(s.flaps)) {
+    s.vfeTimer += hReal;
+    if (s.vfeTimer > 1.5) {
+      return fail(s, "FLAP OVERSPEED", `Flaps ${Math.round(s.flapsCmd)} max is ${vfeFor(s.flaps)} kt. Slow down before you put them out.`);
+    }
+  } else {
+    s.vfeTimer = Math.max(0, s.vfeTimer - hReal);
+  }
+
+  // --- Gates --------------------------------------------------------------------
+  if (gate) {
     const rx = s.x - gate.x;
     const rz = s.z - gate.z;
     const along = rx * gate.tx + rz * gate.tz;
@@ -242,45 +356,110 @@ function physics(s: FlightState, h: number, c: Controls) {
       }
       s.nextGate++;
     } else if (s.phase === "ap" && s.pathS > gate.s + 1500) {
-      // Flew past it some other way (e.g. after hand-flying elsewhere).
       s.gates[s.nextGate] = { status: "missed", at: s.time };
       s.nextGate++;
     }
   }
+  // Only fully hand-flown finals are ranked.
+  if (s.phase === "ap" && s.nextGate >= GATES.length - 3) s.apOnFinal = true;
 
-  // --- Ground contact -------------------------------------------------------
+  // --- Ground contact -------------------------------------------------------------
   const groundHere = terrainHeight(s.x, s.z);
-  if (s.alt <= groundHere) {
-    if (s.phase === "ap" || s.phase === "manual") {
-      if (onRunway(s.x, s.z) && s.vs > -1100 && Math.abs(s.roll) < 20) {
-        toast(s, `${landingGrade(s.vs)}  ${Math.round(s.vs)} FPM · ${s.passed}/${GATES.length} GATES`, s.vs > -600 ? "green" : "amber");
-        setPhase(s, "rollout");
-        // Missed whatever gates are left.
-        while (s.nextGate < GATES.length) s.gates[s.nextGate++] = { status: "missed", at: s.time };
-      } else {
-        toast(s, "TERRAIN. LET'S TRY THAT AGAIN.", "red");
-        setPhase(s, "crashed");
-      }
+  if (s.alt > groundHere) return;
+  s.alt = groundHere;
+  if (s.vs >= 0) return; // just lifted off, not touching down
+
+  if (!onRunway(s.x, s.z)) {
+    if (s.x < RUNWAY.west && s.x > RUNWAY.west - 8000 && Math.abs(s.z) < 700) {
+      return fail(s, "LANDED SHORT", "So close. The runway starts at the piano keys. Aim just past them, never before.");
     }
-    s.alt = groundHere;
-    if (s.vs < 0) s.vs = 0;
+    if (s.x >= RUNWAY.west && s.x <= RUNWAY.east && Math.abs(s.z) < 600) {
+      return fail(s, "OFF THE RUNWAY", "Line up with the centerline early on final, and keep your heading lined up all the way down.");
+    }
+    return fail(s, "TERRAIN", "Watch your altitude. When PULL UP shows, add full power and climb now.");
+  }
+  if (s.ias > MAX_TOUCHDOWN_KT) {
+    return fail(s, "TOO FAST", `Touched down at ${Math.round(s.ias)} kt. Use flaps 30, fly 60–65 kt on final and let it slow in the flare.`);
+  }
+  if (s.vs < MAX_TOUCHDOWN_SINK) {
+    return fail(s, "HARD LANDING", `${Math.round(s.vs)} ft/min. Flare: ease the nose up just above the runway to soften the arrival.`);
+  }
+  if (Math.abs(s.roll) > 8) {
+    return fail(s, "WINGTIP STRIKE", "Level the wings before you touch down.");
+  }
+  if (s.pitch < -0.5) {
+    return fail(s, "NOSEWHEEL FIRST", "Hold the nose up in the flare so the main wheels touch first.");
   }
 
-  const trend = h > 0 ? ((s.ias - prevIas) / h) * 6 : 0;
-  s.speedTrend += (trend - s.speedTrend) * Math.min(1, 3 * h);
+  // A good landing.
+  const distance = Math.max(0, Math.round(s.x - THRESHOLD_X));
+  const ranked = s.phase === "manual" && !s.apOnFinal;
+  const newBest = ranked && (s.best === null || distance < s.best);
+  if (newBest) s.best = distance;
+  s.result = { distance, sink: Math.round(s.vs), speed: Math.round(s.ias), gates: s.passed, rank: rankFor(distance), ranked, newBest };
+  while (s.nextGate < GATES.length) s.gates[s.nextGate++] = { status: "missed", at: s.time };
+  s.airborne = false;
+  s.vs = 0;
+  setPhase(s, "rollout");
+}
+
+function landed(s: FlightState) {
+  setPhase(s, "landed");
+}
+
+// Autopilot: pure-pursuit lateral guidance, a flight-path command that
+// never asks for more climb than the engine can give, an autothrottle with
+// feed-forward, and a flap schedule that respects flap speeds.
+function autopilot(s: FlightState, agl: number) {
+  s.pathS = closestS(s.x, s.z, s.pathS).s;
+  const here = pathAt(s.pathS);
+  const look = pathAt(s.pathS + clamp(s.ias * 1.688 * 4, 900, 2200));
+  const dx = look.x - s.x;
+  const dz = look.z - s.z;
+  const desiredHdg = ((Math.atan2(dx, -dz) / deg) % 360 + 360) % 360;
+  s.rollTarget = clamp(angleDiff(desiredHdg, s.hdg) * 1.3, -25, 25);
+  s.hdgSel = desiredHdg;
+
+  const targetAlt = FIELD + look.agl;
+  s.altSel = Math.round(targetAlt / 100) * 100;
+  let speed = here.speed;
+  let fpa = clamp(Math.atan2(targetAlt - s.alt, Math.hypot(dx, dz)) / deg, -6, 8);
+  const available = Math.asin(clamp((thrustMax(s.ias) - drag(s.ias, s.flaps)) / G_K, -1, 1)) / deg - 0.7;
+  fpa = Math.min(fpa, available);
+  // Slow? Trade climb for speed, but never push over toward the ground.
+  if (s.ias < speed - 4 && fpa > 0) fpa = Math.max(0, fpa - (speed - 4 - s.ias) * 0.25);
+
+  // Flare over the runway: power to idle, shallow the descent.
+  const onFinal = s.nextGate >= GATES.length - 1;
+  const flare = onFinal && agl < 14 && Math.abs(s.z) < 200 && s.x > RUNWAY.west - 1500;
+  if (flare) {
+    // Hold it off, then let it settle onto the mains as the wing gets slow.
+    fpa = s.aoa > 11 ? -2.5 : -1.1;
+    speed = 0;
+  }
+
+  const thrustNeeded = drag(s.ias, s.flaps) + G_K * Math.sin(fpa * deg) + 0.8 * (speed - s.ias);
+  s.throttleCmd = flare ? 0 : clamp(thrustNeeded / thrustMax(s.ias), 0, 1);
+
+  // Flaps: 10 abeam the numbers, 20 on base, 30 on final, never above Vfe.
+  const want = s.nextGate >= 10 ? 30 : s.nextGate >= 9 ? 20 : s.nextGate >= 6 ? 10 : 0;
+  if (want > s.flapsCmd && s.ias < VFE_BY_FLAPS[FLAP_SETTINGS.indexOf(want)] - 5) s.flapsCmd = want;
+  if (want < s.flapsCmd) s.flapsCmd = want;
+
+  return clamp(fpa + s.aoa - INCIDENCE, -10, 15);
 }
 
 export function readouts(s: FlightState) {
-  const airborne = s.phase === "ap" || s.phase === "manual" || (s.phase === "takeoff" && s.alt > FIELD + 5);
-  const chop = airborne ? 1 : 0;
+  const chop = s.airborne ? 1 : 0;
   const t = s.simTime;
-  const pitch = s.pitch + chop * (0.25 * Math.sin(t * 0.9) + 0.1 * Math.sin(t * 2.3));
-  const roll = s.roll + chop * (0.4 * Math.sin(t * 0.7 + 1) + 0.15 * Math.sin(t * 1.9));
+  const pitch = s.pitch + chop * (0.18 * Math.sin(t * 0.9) + 0.07 * Math.sin(t * 2.3));
+  const roll = s.roll + chop * (0.3 * Math.sin(t * 0.7 + 1) + 0.1 * Math.sin(t * 1.9));
   const fpa = Math.asin(clamp(s.vs / (Math.max(s.ias, 1) * 101.27), -1, 1)) / deg;
   const vsRounded = Math.round(s.vs / 50) * 50;
   const hdg = Math.round(s.hdg) % 360;
   const agl = s.alt - terrainHeight(s.x, s.z);
   const aligned = Math.abs(s.z) < 700 && s.x < RUNWAY.east && Math.abs(angleDiff(s.hdg, RUNWAY.heading)) < 35;
+  const flying = s.airborne && (s.phase === "ap" || s.phase === "manual");
 
   return {
     pitch,
@@ -294,18 +473,19 @@ export function readouts(s: FlightState) {
     hdgText: String(hdg === 0 ? 360 : hdg).padStart(3, "0"),
     vsText: Math.abs(vsRounded) >= 100 ? `${vsRounded > 0 ? "+" : ""}${vsRounded}` : "",
     gatesText: `${s.passed}/${GATES.length}`,
-    warning: (s.phase === "ap" || s.phase === "manual") && ((s.vs < -1200 && agl < 1500) || (agl < 400 && s.vs < -500 && !aligned)),
+    stallSpeed: stallSpeed(s.flaps, s.airborne ? s.roll : 0),
+    stallWarning: flying && s.aoa >= AOA_WARN,
+    vfeWarning: flying && s.ias > vfeFor(s.flaps) - 3 && s.flaps > 2,
+    overspeedWarning: flying && s.ias > VNO + 20,
+    terrainWarning: flying && ((s.vs < -1200 && agl < 1500) || (agl < 400 && s.vs < -500 && !aligned)),
     camera: { x: s.x, y: s.alt + EYE_HEIGHT, z: s.z },
   };
 }
 
-export function modeLabel(phase: Phase) {
-  return {
-    takeoff: "TO/GA",
-    ap: "AP · PATH",
-    manual: "YOUR AIRPLANE",
-    rollout: "ROLLOUT",
-    landed: "LANDED",
-    crashed: "TERRAIN",
-  }[phase];
+export function modeLabel(s: FlightState) {
+  if (s.phase === "ap") return s.airborne ? "AP · PATH" : "TO/GA";
+  if (s.phase === "manual") return "YOUR AIRPLANE";
+  if (s.phase === "rollout") return "ROLLOUT";
+  if (s.phase === "landed") return "LANDED";
+  return s.failure?.title ?? "FAILED";
 }
