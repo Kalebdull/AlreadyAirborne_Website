@@ -225,10 +225,10 @@ function About() {
   return (
     <section id="about" className="scroll-mt-20 px-6 pb-28 md:pb-36">
       <div className="card reveal mx-auto flex max-w-[1024px] flex-col overflow-hidden md:flex-row">
-        <div className="flex min-h-[360px] items-center justify-center bg-raised md:min-h-[460px] md:basis-[42%]">
+        <div className="flex aspect-[4/5] items-center justify-center overflow-hidden bg-raised md:aspect-auto md:min-h-[520px] md:basis-[42%]">
           {instructor.photo ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={instructor.photo} alt={instructor.name} className="h-full w-full object-cover" />
+            <img src={instructor.photo} alt={instructor.photoAlt} className="h-full w-full object-cover object-[60%_35%]" />
           ) : (
             <span className="font-mono text-xs text-dim">[PHOTO OF YOU]</span>
           )}
