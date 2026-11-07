@@ -9,6 +9,7 @@ export async function SiteHeader() {
     ? [
         { href: "/dashboard", label: "Dashboard" },
         { href: "/library", label: "Library" },
+        { href: "/leaderboard", label: "Leaderboard" },
         { href: "/book", label: "Book" },
         ...(viewer.isAdmin ? [{ href: "/admin", label: "Admin" }] : []),
       ]
@@ -16,6 +17,7 @@ export async function SiteHeader() {
         { href: "/#sessions", label: "Sessions" },
         { href: "/#oral", label: "Mock Oral" },
         { href: "/library", label: "Library" },
+        { href: "/leaderboard", label: "Leaderboard" },
         { href: "/#about", label: "About" },
       ];
 

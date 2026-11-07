@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { LogoMark } from "@/components/logo";
-import { createFlight, MAX_TOUCHDOWN_KT, modeLabel, RANKS, readouts, step, type Controls, type FlightState } from "./flight-model";
+import { createFlight, MAX_TOUCHDOWN_KT, modeLabel, readouts, step, type Controls, type FlightState } from "./flight-model";
+import { decode, encode, quantize, toControls, type Frame } from "./replay";
 import type { SvtScene } from "./scene";
+import { ScoreSubmit, type SubmitApi } from "./score-submit";
 import { GATES } from "./world";
 
 // A working Garmin-style primary flight display with synthetic vision, and
@@ -29,19 +31,18 @@ const ROLL_TICKS = [-60, -45, -30, -20, -10, 0, 10, 20, 30, 45, 60];
 
 const ENGAGE_DELAY = 250; // ms hovering before you take the controls
 const RELEASE_DELAY = 700; // ms after leaving before the autopilot takes back over
-const BEST_KEY = "aa-pfd-best-v1";
+const BEST_KEY = "aa-pfd-best-score-v2";
 
 function headingLabel(deg: number) {
   const h = ((deg % 360) + 360) % 360;
   return ({ 0: "N", 90: "E", 180: "S", 270: "W" } as Record<number, string>)[h] ?? (h % 30 === 0 ? String(h / 10) : "");
 }
 
-function rankFor(distance: number) {
-  return RANKS.find(([max]) => distance <= max)![1];
-}
-
 export function Pfd() {
   const root = useRef<HTMLDivElement>(null);
+  const holdRef = useRef(false); // true while the leaderboard panel is open
+  const submitRef = useRef<SubmitApi | null>(null);
+  const actionsRef = useRef<{ flyAgain: () => void } | null>(null);
 
   useEffect(() => {
     const el = root.current;
@@ -69,6 +70,7 @@ export function Pfd() {
       mode: q<HTMLSpanElement>("mode"),
       gs: q<HTMLSpanElement>("gs"),
       gates: q<HTMLSpanElement>("gates"),
+      wind: q<HTMLSpanElement>("wind"),
       utc: q<HTMLSpanElement>("utc"),
       annStall: q<HTMLDivElement>("ann-stall"),
       annVfe: q<HTMLDivElement>("ann-vfe"),
@@ -87,6 +89,8 @@ export function Pfd() {
       cardTitle: q<HTMLSpanElement>("card-title"),
       cardSub: q<HTMLSpanElement>("card-sub"),
       cardStats: q<HTMLDivElement>("card-stats"),
+      cardSubmit: q<HTMLButtonElement>("card-submit"),
+      cardHint: q<HTMLSpanElement>("card-hint"),
       touchToggle: q<HTMLButtonElement>("touch-toggle"),
     };
     const fallback = el.querySelectorAll<HTMLElement>('[data-pfd="fallback"]');
@@ -160,46 +164,82 @@ export function Pfd() {
     let savedBest = flight.best;
     let resizeObserver: ResizeObserver | null = null;
 
+    // Every run is recorded from brake release so a hand-flown landing can
+    // be verified by the server (see replay.ts).
+    let frames: Frame[] = [];
+    let recording = true;
+    let pending: { replay: string } | null = null;
+    actionsRef.current = {
+      flyAgain: () => {
+        input.retry = true;
+      },
+    };
+
+    // Development only: play a recorded run through the real loop, for testing.
+    let scripted: Frame[] | null = null;
+    let scriptedAt = 0;
+    if (process.env.NODE_ENV === "development") {
+      (window as unknown as { __pfd?: unknown }).__pfd = {
+        play(data: string) {
+          scripted = decode(data);
+          scriptedAt = 0;
+          Object.assign(flight, createFlight(), { best: flight.best, resets: flight.resets + 1, time: flight.time });
+          frames = [];
+          recording = true;
+          pending = null;
+        },
+      };
+    }
+
     function renderCard(s: FlightState) {
-      const show = s.phase === "failed" || ((s.phase === "landed" || s.phase === "rollout") && s.result !== null);
-      const key = show ? `${s.phase === "failed" ? "f" : "r"}|${s.resets}` : "";
+      const show = !holdRef.current && (s.phase === "failed" || ((s.phase === "landed" || s.phase === "rollout") && s.result !== null));
+      const key = show ? `${s.phase === "failed" ? "f" : "r"}|${s.resets}` : "hidden";
       if (key === lastCard) return;
       lastCard = key;
       parts.card.dataset.on = show ? "true" : "false";
       if (!show) return;
+      const cells = (stats: [string, string][]) =>
+        stats.map(([label, value]) => {
+          const cell = document.createElement("div");
+          cell.className = "flex flex-col gap-0.5";
+          const l = document.createElement("span");
+          l.className = "text-[9px] tracking-[.12em] text-dim md:text-[10px]";
+          l.textContent = label;
+          const v = document.createElement("span");
+          v.className = `text-[13px] tabular-nums md:text-[14px] ${value.startsWith("-") ? "text-red" : "text-ink"}`;
+          v.textContent = value;
+          cell.append(l, v);
+          return cell;
+        });
       if (s.phase === "failed" && s.failure) {
         parts.card.dataset.tone = "red";
         parts.cardEyebrow.textContent = "RUN OVER";
         parts.cardTitle.textContent = s.failure.title;
         parts.cardSub.textContent = s.failure.tip;
         parts.cardStats.replaceChildren();
+        parts.cardSubmit.hidden = true;
+        parts.cardHint.textContent = "";
         return;
       }
       const r = s.result!;
+      const b = r.breakdown;
       parts.card.dataset.tone = r.newBest ? "magenta" : "green";
-      parts.cardEyebrow.textContent = r.newBest ? "NEW PERSONAL BEST" : r.ranked ? "LANDED" : "AUTOPILOT LANDING · NOT RANKED";
-      parts.cardTitle.textContent = r.rank;
-      parts.cardSub.textContent = `${r.distance.toLocaleString()} ft past the threshold`;
-      const stats: [string, string][] = [
-        ["SINK", `${r.sink} FPM`],
-        ["SPEED", `${r.speed} KT`],
-        ["GATES", `${r.gates}/${GATES.length}`],
-        ["BEST", s.best === null ? "—" : `${s.best.toLocaleString()} FT`],
-      ];
+      parts.cardEyebrow.textContent = r.newBest ? "NEW PERSONAL BEST" : r.ranked ? "SCORE" : "AUTOPILOT HELPED · NOT RANKED";
+      parts.cardTitle.textContent = r.score.toLocaleString();
+      parts.cardSub.textContent = `${r.rank} · ${r.distance.toLocaleString()} ft past the threshold`;
+      const fmt = (n: number) => (n > 0 ? `+${n}` : String(n));
       parts.cardStats.replaceChildren(
-        ...stats.map(([label, value]) => {
-          const cell = document.createElement("div");
-          cell.className = "flex flex-col gap-0.5";
-          const l = document.createElement("span");
-          l.className = "text-[10px] tracking-[.12em] text-dim";
-          l.textContent = label;
-          const v = document.createElement("span");
-          v.className = "text-[13px] text-ink md:text-[15px]";
-          v.textContent = value;
-          cell.append(l, v);
-          return cell;
-        }),
+        ...cells([
+          ["GATES", fmt(b.gates)],
+          ["LANDING", fmt(b.landing)],
+          ["TOUCHDOWN", fmt(b.touchdown)],
+          ["CENTERLINE", fmt(b.centerline)],
+          ["TIME", fmt(b.time)],
+          ["PENALTIES", b.penalties ? String(b.penalties) : "0"],
+        ]),
       );
+      parts.cardSubmit.hidden = !r.ranked;
+      parts.cardHint.textContent = r.ranked ? "" : "PRESS R AND HAND-FLY FROM THE TAKEOFF ROLL TO SCORE";
     }
 
     function render(s: FlightState) {
@@ -232,7 +272,7 @@ export function Pfd() {
       const text = [
         r.iasText, r.altText, r.hdgText, r.vsText, modeLabel(s), s.phase, s.altSel, r.gatesText,
         r.stallWarning, r.vfeWarning, r.overspeedWarning, r.terrainWarning,
-        Math.round(s.throttle * 100), s.flapsCmd, s.best, input.touchFlying, showToast ? s.toast!.at : "",
+        Math.round(s.throttle * 100), s.flapsCmd, s.best, input.touchFlying, showToast ? s.toast!.at : "", r.windText,
       ].join("|");
       if (text !== lastText) {
         lastText = text;
@@ -243,6 +283,7 @@ export function Pfd() {
         parts.vsiText.textContent = r.vsText;
         parts.altSel.textContent = String(s.altSel);
         parts.gates.textContent = r.gatesText;
+        parts.wind.textContent = r.windText;
         parts.mode.textContent = modeLabel(s);
         parts.mode.dataset.mode = s.phase;
         parts.annStall.dataset.on = String(r.stallWarning);
@@ -251,8 +292,8 @@ export function Pfd() {
         parts.annTerrain.dataset.on = String(r.terrainWarning);
         parts.pwrText.textContent = `${Math.round(s.throttle * 100)}%`;
         parts.flapText.textContent = `${s.flapsCmd}°`;
-        parts.best.textContent = s.best === null ? "—" : `${s.best.toLocaleString()} FT`;
-        parts.bestRank.textContent = s.best === null ? "LAND TO SET A SCORE" : rankFor(s.best);
+        parts.best.textContent = s.best === null ? "—" : s.best.toLocaleString();
+        parts.bestRank.textContent = s.best === null ? "HAND-FLY A LAP TO SCORE" : "YOUR BEST SCORE";
         parts.touchToggle.textContent = input.touchFlying ? "AP" : "FLY";
         parts.touchToggle.dataset.on = String(input.touchFlying);
         if (showToast) {
@@ -279,7 +320,27 @@ export function Pfd() {
       // Clamp long gaps (tab switches, slow frames) so nothing ever jumps.
       const dt = Math.min(0.05, Math.max(0, (t - last) / 1000));
       last = t;
-      step(flight, dt, controls(t, dt));
+      const c = controls(t, dt);
+      // Test playback runs several recorded frames per screen frame.
+      const reps = scripted && scriptedAt < scripted.length ? 4 : 1;
+      for (let i = 0; i < reps; i++) {
+        const f = scripted && scriptedAt < scripted.length ? scripted[scriptedAt++] : quantize(dt, c);
+        const before = flight.resets;
+        // Keep a ranked result on screen until you choose to submit or fly again.
+        const resultUp = flight.result?.ranked === true && (flight.phase === "rollout" || flight.phase === "landed");
+        step(flight, f.dt, toControls(f, { retry: c.retry && !holdRef.current, hold: holdRef.current || resultUp }));
+        if (flight.resets !== before) {
+          frames = [];
+          recording = true;
+          pending = null;
+        } else if (recording) {
+          frames.push(f);
+          if (flight.phase === "rollout" || flight.phase === "failed" || flight.phase === "landed" || frames.length > 60000) {
+            recording = false;
+            if (flight.result?.ranked) pending = { replay: encode(frames) };
+          }
+        }
+      }
       render(flight);
       if (visible && !disposed) raf = requestAnimationFrame(frame);
     }
@@ -388,6 +449,10 @@ export function Pfd() {
       if (action === "flaps-down") input.flaps = 1;
       if (action === "flaps-up") input.flaps = -1;
       if (action === "retry") input.retry = true;
+      if (action === "submit" && pending && flight.result) {
+        submitRef.current?.open({ result: flight.result, replay: pending.replay });
+        lastCard = "";
+      }
       if (action === "touch-toggle") {
         input.touchFlying = !input.touchFlying;
         input.touching = false;
@@ -455,6 +520,9 @@ export function Pfd() {
             </span>
             <span className="hidden md:inline">
               GS <span data-pfd="gs" className="text-ink">---</span>KT
+            </span>
+            <span className="hidden lg:inline">
+              WIND <span data-pfd="wind" className="text-ink">160°/10</span>
             </span>
             <span>
               GATES <span data-pfd="gates" className="text-magenta">0/{GATES.length}</span>
@@ -669,12 +737,12 @@ export function Pfd() {
 
               {/* Personal best */}
               <div className="pointer-events-none absolute bottom-3 right-3 hidden flex-col items-end rounded-xl bg-black/60 px-3 py-2 font-mono ring-1 ring-white/15 backdrop-blur sm:flex md:bottom-6 md:right-6">
-                <span className="text-[9px] tracking-[.12em] text-dim md:text-[10px]">SHORTEST LANDING</span>
+                <span className="text-[9px] tracking-[.12em] text-dim md:text-[10px]">PERSONAL BEST</span>
                 <span data-pfd="best" className="font-display text-xl font-semibold tabular-nums md:text-2xl">
                   —
                 </span>
                 <span data-pfd="best-rank" className="text-[9px] tracking-[.1em] text-magenta md:text-[10px]">
-                  LAND TO SET A SCORE
+                  HAND-FLY A LAP TO SCORE
                 </span>
               </div>
 
@@ -703,24 +771,38 @@ export function Pfd() {
               />
 
               {/* Result / failure card */}
-              <button
-                type="button"
+              <div
                 data-pfd="card"
-                data-action="retry"
                 data-on="false"
                 data-tone="green"
                 aria-live="assertive"
-                className="group pointer-events-none absolute left-1/2 top-1/2 flex w-[86%] max-w-[420px] -translate-x-1/2 -translate-y-[46%] scale-95 flex-col items-center gap-2 rounded-2xl bg-black/75 px-6 py-5 text-center opacity-0 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-[opacity,transform] duration-300 data-[on=true]:pointer-events-auto data-[on=true]:-translate-y-1/2 data-[on=true]:scale-100 data-[on=true]:opacity-100 md:gap-3 md:px-8 md:py-6"
+                className="group pointer-events-none absolute left-1/2 top-1/2 z-10 flex w-[90%] max-w-[440px] -translate-x-1/2 -translate-y-[46%] scale-95 flex-col items-center gap-2 rounded-2xl bg-black/80 px-5 py-4 text-center opacity-0 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-[opacity,transform] duration-300 data-[on=true]:pointer-events-auto data-[on=true]:-translate-y-1/2 data-[on=true]:scale-100 data-[on=true]:opacity-100 md:gap-2.5 md:px-7 md:py-6"
               >
                 <span data-pfd="card-eyebrow" className="font-mono text-[10px] tracking-[.16em] text-dim md:text-[11px]" />
                 <span
                   data-pfd="card-title"
-                  className="font-display text-[28px] font-bold leading-none tracking-[-.02em] group-data-[tone=green]:text-green group-data-[tone=magenta]:text-magenta group-data-[tone=red]:text-red md:text-[40px]"
+                  className="font-display text-[34px] font-bold leading-none tracking-[-.03em] tabular-nums group-data-[tone=green]:text-green group-data-[tone=magenta]:text-magenta group-data-[tone=red]:text-red md:text-[46px]"
                 />
-                <span data-pfd="card-sub" className="max-w-[340px] text-[13px] leading-snug text-soft md:text-[15px]" />
-                <div data-pfd="card-stats" className="grid w-full grid-cols-4 gap-2 border-t border-white/10 pt-3 font-mono empty:hidden" />
-                <span className="font-mono text-[10px] tracking-[.14em] text-cyan md:text-[11px]">PRESS R OR TAP TO FLY AGAIN</span>
-              </button>
+                <span data-pfd="card-sub" className="max-w-[360px] text-[13px] leading-snug text-soft md:text-[15px]" />
+                <div data-pfd="card-stats" className="grid w-full grid-cols-3 gap-x-2 gap-y-2.5 border-t border-white/10 pt-3 font-mono empty:hidden" />
+                <span data-pfd="card-hint" className="font-mono text-[10px] tracking-[.1em] text-amber empty:hidden" />
+                <div className="mt-1 flex w-full gap-2">
+                  <button type="button" data-pfd="card-submit" data-action="submit" hidden className="btn btn-primary btn-sm flex-1 !text-[13px]">
+                    Enter leaderboard
+                  </button>
+                  <button type="button" data-action="retry" className="btn btn-ghost btn-sm flex-1 !text-[13px]">
+                    Fly again <span className="ml-1 font-mono text-[11px] text-dim">R</span>
+                  </button>
+                </div>
+              </div>
+
+              <ScoreSubmit
+                apiRef={submitRef}
+                holdRef={holdRef}
+                onClose={(flyAgain) => {
+                  if (flyAgain) actionsRef.current?.flyAgain();
+                }}
+              />
 
               {/* Reset fade */}
               <div data-pfd="fade" className="pointer-events-none absolute inset-0 bg-black opacity-0" />
@@ -756,7 +838,7 @@ export function Pfd() {
         </p>
         <p className="md:hidden">TAP FLY · DRAG TO STEER · BUTTONS FOR POWER &amp; FLAPS</p>
         <p className="max-w-[640px] text-[10px] leading-relaxed md:text-[11px]">
-          FLY THE MAGENTA GATES, THEN LAND AS CLOSE TO THE THRESHOLD AS YOU CAN: UNDER {MAX_TOUCHDOWN_KT} KT, GENTLE, WINGS LEVEL, NOSE UP. LAND SHORT AND THE RUN IS OVER.
+          PRESS R ON THE RUNWAY AND HAND-FLY THE WHOLE LAP. THREAD THE GATES, FIGHT THE CROSSWIND, AND LAND AS CLOSE TO THE THRESHOLD AS YOU DARE: UNDER {MAX_TOUCHDOWN_KT} KT, GENTLE, WINGS LEVEL. LAND SHORT AND THE RUN IS OVER.
         </p>
       </div>
     </div>

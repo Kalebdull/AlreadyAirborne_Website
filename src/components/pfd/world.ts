@@ -173,10 +173,24 @@ export function closestS(x: number, z: number, hint?: number) {
   return { s: best, distance: Math.sqrt(bestD) };
 }
 
+// --- Wind -------------------------------------------------------------------
+// The same gusty crosswind for everyone, so scores are comparable: from
+// 160° at about 10 kt, gusting. A pure function of run time, so a recorded
+// flight replays identically on the server.
+export const WIND_FROM = 160;
+
+export function windAt(t: number) {
+  const speed = 10 + 3 * Math.sin(t * 0.21) + 1.6 * Math.sin(t * 0.67 + 1.3);
+  const from = WIND_FROM + 8 * Math.sin(t * 0.13 + 0.4);
+  const toward = ((from + 180) * Math.PI) / 180;
+  // Velocity in ft/s: +x east, -z north.
+  return { speed, from, vx: Math.sin(toward) * speed * 1.68781, vz: -Math.cos(toward) * speed * 1.68781 };
+}
+
 // --- Gates --------------------------------------------------------------------
 
-export const GATE_W = 380;
-export const GATE_H = 260;
+export const GATE_W = 320;
+export const GATE_H = 220;
 
 export type Gate = { s: number; x: number; y: number; z: number; tx: number; tz: number };
 

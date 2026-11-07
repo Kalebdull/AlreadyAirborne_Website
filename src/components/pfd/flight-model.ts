@@ -11,25 +11,38 @@
 // Physics runs in fixed 1/120 s substeps so it behaves identically at any
 // frame rate and never jumps after a slow frame.
 
-import { closestS, FIELD, GATE_H, GATE_W, GATES, onRunway, pathAt, RUNWAY, terrainHeight, THRESHOLD_X } from "./world";
+import { closestS, FIELD, GATE_H, GATE_W, GATES, onRunway, pathAt, RUNWAY, terrainHeight, THRESHOLD_X, windAt } from "./world";
 
 export type Phase = "ap" | "manual" | "rollout" | "landed" | "failed";
 export type Tone = "green" | "amber" | "red" | "cyan" | "magenta";
 export type GateState = { status: "pending" | "passed" | "missed"; at: number };
 export type Failure = { title: string; tip: string };
+export type Breakdown = {
+  gates: number;
+  landing: number;
+  touchdown: number;
+  centerline: number;
+  time: number;
+  penalties: number;
+};
 export type Result = {
+  score: number;
+  breakdown: Breakdown;
   distance: number; // touchdown point past the threshold, ft
   sink: number; // ft/min at touchdown
   speed: number; // kt at touchdown
+  offset: number; // ft from the centerline at touchdown
   gates: number;
+  runTime: number; // sim seconds from brake release to touchdown
   rank: string;
-  ranked: boolean; // hand-flown all the way down final
+  ranked: boolean; // hand-flown the whole way, from the takeoff roll
   newBest: boolean;
 };
 
 export type FlightState = {
   time: number; // real seconds
-  simTime: number;
+  simTime: number; // for visuals only; carries across runs
+  runTime: number; // sim seconds since this run started (drives wind)
   phase: Phase;
   phaseTime: number; // real seconds in this phase
   airborne: boolean;
@@ -56,11 +69,14 @@ export type FlightState = {
   gates: GateState[];
   nextGate: number;
   passed: number;
-  apOnFinal: boolean;
+  apUsed: boolean; // the autopilot flew part of this run
+  gatePoints: number;
+  stallWarnTime: number;
+  flapWarnTime: number;
   toast: { text: string; tone: Tone; at: number } | null;
   failure: Failure | null;
   result: Result | null;
-  best: number | null; // best ranked touchdown distance, ft
+  best: number | null; // best ranked score
   fade: number;
   fadingIn: boolean;
   resets: number;
@@ -71,6 +87,7 @@ export type Controls = {
   throttle: number; // -1, 0 or 1: power down / hold / up
   flaps: number; // -1, 0 or 1: one notch up / down (edge-triggered)
   retry: boolean;
+  hold?: boolean; // keep the result up (e.g. while entering a leaderboard score)
 };
 
 // --- Airplane numbers (Cessna 172-ish) ------------------------------------------
@@ -80,8 +97,9 @@ export const VFE_BY_FLAPS = [Infinity, 110, 85, 85]; // max flap extended speed
 const FLAP_DRAG = [1, 1.15, 1.45, 1.9];
 export const VNE = 163;
 export const VNO = 129;
-export const MAX_TOUCHDOWN_KT = 70;
-const MAX_TOUCHDOWN_SINK = -600;
+export const MAX_TOUCHDOWN_KT = 65;
+export const MAX_TOUCHDOWN_SINK = -500;
+export const MAX_TOUCHDOWN_BANK = 6;
 const AOA_CRIT = 16; // wing stalls here
 const AOA_WARN = 13; // stall horn
 const INCIDENCE = 3; // wing incidence: body pitch = flight path + AoA - 3°
@@ -136,6 +154,7 @@ export function createFlight(reduced = false): FlightState {
   const s: FlightState = {
     time: 0,
     simTime: 0,
+    runTime: 0,
     phase: "ap",
     phaseTime: 0,
     airborne: false,
@@ -162,7 +181,10 @@ export function createFlight(reduced = false): FlightState {
     gates: GATES.map(() => ({ status: "pending" as const, at: 0 })),
     nextGate: 0,
     passed: 0,
-    apOnFinal: false,
+    apUsed: false,
+    gatePoints: 0,
+    stallWarnTime: 0,
+    flapWarnTime: 0,
     toast: null,
     failure: null,
     result: null,
@@ -222,9 +244,14 @@ export function step(s: FlightState, dtReal: number, c: Controls) {
   if (s.fadingIn) {
     s.fade = Math.max(0, 1 - s.phaseTime / 0.45);
     if (s.fade === 0) s.fadingIn = false;
+  } else if (c.retry && s.phaseTime > 0.3 && (s.phase === "failed" || s.phase === "landed" || s.phase === "rollout")) {
+    // Fly again: straight back to the runway.
+    reset(s);
+  } else if (c.hold && (s.phase === "failed" || s.phase === "landed" || s.phase === "rollout")) {
+    s.phaseTime = Math.min(s.phaseTime, 0.5);
+    s.fade = 0;
   } else if (s.phase === "failed" || s.phase === "landed") {
     const hold = s.phase === "landed" ? 4.5 : 3.2;
-    if (c.retry && s.phaseTime > 0.4) s.phaseTime = Math.max(s.phaseTime, hold);
     s.fade = clamp((s.phaseTime - hold) / 0.35, 0, 1);
     if (s.fade >= 1) reset(s);
   } else {
@@ -234,6 +261,7 @@ export function step(s: FlightState, dtReal: number, c: Controls) {
 
 function physics(s: FlightState, h: number, hReal: number, c: Controls) {
   s.simTime += h;
+  s.runTime += h;
   const ground = terrainHeight(s.x, s.z);
   const agl = s.alt - ground;
 
@@ -270,12 +298,26 @@ function physics(s: FlightState, h: number, hReal: number, c: Controls) {
     rollTarget = s.rollTarget;
   }
 
+  // Any autopilot flying (beyond the first moment of the takeoff roll)
+  // disqualifies the run from the leaderboard.
+  if (s.phase === "ap" && (s.airborne || s.ias > 15)) s.apUsed = true;
+
   // --- Controls and configuration ------------------------------------------------
   const manual = s.phase === "manual";
   s.roll += (rollTarget - s.roll) * Math.min(1, (manual ? 2.6 : 1.5) * h);
   s.pitch += (pitchTarget - s.pitch) * Math.min(1, (manual ? 2.2 : 1.4) * h);
   s.throttle += clamp(s.throttleCmd - s.throttle, -1.5 * h, 1.5 * h);
   s.flaps += clamp(s.flapsCmd - s.flaps, -3.5 * h, 3.5 * h);
+
+  // Turbulence: gusts that nudge the airplane off attitude. You (or the
+  // autopilot) have to keep correcting. Deterministic in run time.
+  const wind = windAt(s.runTime);
+  if (s.airborne) {
+    const t = s.runTime;
+    const gust = (wind.speed - 8) / 6;
+    s.roll += gust * (3.2 * Math.sin(t * 1.31) + 2.1 * Math.sin(t * 2.87 + 2.1) + 1.2 * Math.sin(t * 5.3 + 0.7)) * h;
+    s.pitch += gust * (0.9 * Math.sin(t * 1.07 + 1.1) + 0.6 * Math.sin(t * 3.41)) * h;
+  }
   s.aoa = aoaFor(s.ias, s.flaps, s.airborne ? s.roll : 0);
 
   // --- Energy -------------------------------------------------------------------
@@ -309,9 +351,11 @@ function physics(s: FlightState, h: number, hReal: number, c: Controls) {
 
   const gate = GATES[s.nextGate];
   const alongBefore = gate ? (s.x - gate.x) * gate.tx + (s.z - gate.z) * gate.tz : 0;
-  const gs = s.ias * 1.68781 * Math.cos(fpa * deg);
-  s.x += Math.sin(s.hdg * deg) * gs * h;
-  s.z += -Math.cos(s.hdg * deg) * gs * h;
+  const tas = s.ias * 1.68781 * Math.cos(fpa * deg);
+  // In the air the wind carries you; on the ground the wheels don't drift.
+  const drift = s.airborne ? 1 : 0;
+  s.x += (Math.sin(s.hdg * deg) * tas + wind.vx * drift) * h;
+  s.z += (-Math.cos(s.hdg * deg) * tas + wind.vz * drift) * h;
 
   const trend = h > 0 ? ((s.ias - prevIas) / h) * 6 : 0;
   s.speedTrend += (trend - s.speedTrend) * Math.min(1, 3 * h);
@@ -329,7 +373,9 @@ function physics(s: FlightState, h: number, hReal: number, c: Controls) {
   if (s.ias > VNE) {
     return fail(s, "OVERSPEED", "Past the red line (163 kt). Ease the nose up and pull the power back in a dive.");
   }
+  if (s.aoa >= AOA_WARN) s.stallWarnTime += hReal;
   if (s.ias > vfeFor(s.flaps)) {
+    s.flapWarnTime += hReal;
     s.vfeTimer += hReal;
     if (s.vfeTimer > 1.5) {
       return fail(s, "FLAP OVERSPEED", `Flaps ${Math.round(s.flapsCmd)} max is ${vfeFor(s.flaps)} kt. Slow down before you put them out.`);
@@ -346,11 +392,15 @@ function physics(s: FlightState, h: number, hReal: number, c: Controls) {
     if (along >= 0 && alongBefore < 0 && Math.hypot(rx, rz) < 1500) {
       const lateral = Math.abs(-rx * gate.tz + rz * gate.tx);
       const vertical = Math.abs(s.alt - gate.y);
-      const hit = lateral < GATE_W / 2 + 30 && vertical < GATE_H / 2 + 30;
+      const hit = lateral < GATE_W / 2 && vertical < GATE_H / 2;
       s.gates[s.nextGate] = { status: hit ? "passed" : "missed", at: s.time };
       if (hit) {
         s.passed++;
-        toast(s, `GATE ${s.nextGate + 1}/${GATES.length}`, "green");
+        // 100 for threading it, up to 50 more for dead center.
+        const error = Math.max(lateral / (GATE_W / 2), vertical / (GATE_H / 2));
+        const points = 100 + Math.round(50 * (1 - error));
+        s.gatePoints += points;
+        toast(s, `GATE ${s.nextGate + 1}/${GATES.length}  +${points}`, "green");
       } else {
         toast(s, "GATE MISSED", "amber");
       }
@@ -360,8 +410,6 @@ function physics(s: FlightState, h: number, hReal: number, c: Controls) {
       s.nextGate++;
     }
   }
-  // Only fully hand-flown finals are ranked.
-  if (s.phase === "ap" && s.nextGate >= GATES.length - 3) s.apOnFinal = true;
 
   // --- Ground contact -------------------------------------------------------------
   const groundHere = terrainHeight(s.x, s.z);
@@ -379,24 +427,48 @@ function physics(s: FlightState, h: number, hReal: number, c: Controls) {
     return fail(s, "TERRAIN", "Watch your altitude. When PULL UP shows, add full power and climb now.");
   }
   if (s.ias > MAX_TOUCHDOWN_KT) {
-    return fail(s, "TOO FAST", `Touched down at ${Math.round(s.ias)} kt. Use flaps 30, fly 60–65 kt on final and let it slow in the flare.`);
+    return fail(s, "TOO FAST", `Touched down at ${Math.round(s.ias)} kt. Use flaps 30, fly about 60 kt on final and let it slow in the flare.`);
   }
   if (s.vs < MAX_TOUCHDOWN_SINK) {
     return fail(s, "HARD LANDING", `${Math.round(s.vs)} ft/min. Flare: ease the nose up just above the runway to soften the arrival.`);
   }
-  if (Math.abs(s.roll) > 8) {
+  if (Math.abs(s.roll) > MAX_TOUCHDOWN_BANK) {
     return fail(s, "WINGTIP STRIKE", "Level the wings before you touch down.");
   }
   if (s.pitch < -0.5) {
     return fail(s, "NOSEWHEEL FIRST", "Hold the nose up in the flare so the main wheels touch first.");
   }
 
-  // A good landing.
+  // A good landing: score it.
   const distance = Math.max(0, Math.round(s.x - THRESHOLD_X));
-  const ranked = s.phase === "manual" && !s.apOnFinal;
-  const newBest = ranked && (s.best === null || distance < s.best);
-  if (newBest) s.best = distance;
-  s.result = { distance, sink: Math.round(s.vs), speed: Math.round(s.ias), gates: s.passed, rank: rankFor(distance), ranked, newBest };
+  const sink = Math.round(s.vs);
+  const offset = Math.round(Math.abs(s.z));
+  const missed = s.nextGate - s.passed + (GATES.length - s.nextGate);
+  const breakdown: Breakdown = {
+    gates: s.gatePoints,
+    landing: Math.round(Math.max(0, 2000 - distance) * 0.75),
+    touchdown: Math.round(Math.max(0, 500 + sink) * 0.8),
+    centerline: Math.round(Math.max(0, 300 - offset * 4)),
+    time: Math.round(Math.max(0, (330 - s.runTime) * 4)),
+    penalties: -Math.round((s.stallWarnTime + s.flapWarnTime) * 100 + missed * 75),
+  };
+  const score = Math.max(0, Object.values(breakdown).reduce((a, b) => a + b, 0));
+  const ranked = s.phase === "manual" && !s.apUsed;
+  const newBest = ranked && (s.best === null || score > s.best);
+  if (newBest) s.best = score;
+  s.result = {
+    score,
+    breakdown,
+    distance,
+    sink,
+    speed: Math.round(s.ias),
+    offset,
+    gates: s.passed,
+    runTime: Math.round(s.runTime),
+    rank: rankFor(distance),
+    ranked,
+    newBest,
+  };
   while (s.nextGate < GATES.length) s.gates[s.nextGate++] = { status: "missed", at: s.time };
   s.airborne = false;
   s.vs = 0;
@@ -413,11 +485,18 @@ function landed(s: FlightState) {
 function autopilot(s: FlightState, agl: number) {
   s.pathS = closestS(s.x, s.z, s.pathS).s;
   const here = pathAt(s.pathS);
-  const look = pathAt(s.pathS + clamp(s.ias * 1.688 * 4, 900, 2200));
+  const look = pathAt(s.pathS + clamp(s.ias * 1.688 * 3, 700, 1600));
   const dx = look.x - s.x;
   const dz = look.z - s.z;
-  const desiredHdg = ((Math.atan2(dx, -dz) / deg) % 360 + 360) % 360;
-  s.rollTarget = clamp(angleDiff(desiredHdg, s.hdg) * 1.3, -25, 25);
+  // Steer the ground track, not the nose: crab into the wind by the wind
+  // correction angle, like a pilot does in a crosswind.
+  const track = Math.atan2(dx, -dz) / deg;
+  const wind = windAt(s.runTime);
+  const tas = Math.max(s.ias * 1.68781, 1);
+  const cross = wind.vx * Math.cos(track * deg) + wind.vz * Math.sin(track * deg);
+  const wca = Math.asin(clamp(-cross / tas, -0.5, 0.5)) / deg;
+  const desiredHdg = (((track + wca) % 360) + 360) % 360;
+  s.rollTarget = clamp(angleDiff(desiredHdg, s.hdg) * 1.5, -25, 25);
   s.hdgSel = desiredHdg;
 
   const targetAlt = FIELD + look.agl;
@@ -473,6 +552,10 @@ export function readouts(s: FlightState) {
     hdgText: String(hdg === 0 ? 360 : hdg).padStart(3, "0"),
     vsText: Math.abs(vsRounded) >= 100 ? `${vsRounded > 0 ? "+" : ""}${vsRounded}` : "",
     gatesText: `${s.passed}/${GATES.length}`,
+    windText: (() => {
+      const w = windAt(s.runTime);
+      return `${String(Math.round(w.from / 10) * 10).padStart(3, "0")}°/${Math.round(w.speed)}`;
+    })(),
     stallSpeed: stallSpeed(s.flaps, s.airborne ? s.roll : 0),
     stallWarning: flying && s.aoa >= AOA_WARN,
     vfeWarning: flying && s.ias > vfeFor(s.flaps) - 3 && s.flaps > 2,

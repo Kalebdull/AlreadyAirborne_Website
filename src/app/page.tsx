@@ -4,6 +4,7 @@ import { site } from "@/lib/site";
 import { Pfd } from "@/components/pfd/pfd";
 import { RiseText } from "@/components/rise-text";
 import { Spotlight } from "@/components/spotlight";
+import { LeaderboardSection } from "@/components/leaderboard-section";
 
 export default async function Home() {
   const { topics, clips } = await getLibrary();
@@ -13,6 +14,7 @@ export default async function Home() {
   return (
     <main>
       <Hero />
+      <LeaderboardSection />
       <Offers />
 
       <section id="library" className="px-6 py-24 md:py-32">

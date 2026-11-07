@@ -189,3 +189,35 @@ export async function deleteTopic(id: string): Promise<AdminState> {
   refresh();
   return error ? { error: "Move or delete this topic's clips first." } : undefined;
 }
+
+// --- Contests & leaderboard --------------------------------------------------
+
+export async function saveContest(_: AdminState, formData: FormData): Promise<AdminState> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  const prize = String(formData.get("prize") ?? "").trim();
+  const startsAt = new Date(String(formData.get("starts_at") ?? ""));
+  const endsAt = new Date(String(formData.get("ends_at") ?? ""));
+  if (!title || !prize) return { error: "Give the contest a title and a prize." };
+  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) {
+    return { error: "The end has to be after the start." };
+  }
+  const supabase = await createClient();
+  const row = { title, prize, starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString() };
+  const { error } = id ? await supabase.from("contests").update(row).eq("id", id) : await supabase.from("contests").insert(row);
+  revalidatePath("/admin/contest");
+  revalidatePath("/leaderboard", "layout");
+  revalidatePath("/");
+  return error ? { error: error.message } : { message: id ? "Contest updated." : "Contest created." };
+}
+
+export async function deleteScore(id: string): Promise<AdminState> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { error } = await supabase.from("scores").delete().eq("id", id);
+  revalidatePath("/admin/contest");
+  revalidatePath("/leaderboard", "layout");
+  revalidatePath("/");
+  return error ? { error: error.message } : undefined;
+}
