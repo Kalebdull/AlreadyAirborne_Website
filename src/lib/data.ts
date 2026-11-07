@@ -68,7 +68,7 @@ export async function signedUrl(path: string | null, seconds = 60 * 60) {
 }
 
 export async function getBookingInputs(fromIso: string, toIso: string) {
-  const fallback: BookingConfig = { timezone: "America/New_York", booking_window_days: 21, min_notice_hours: 12 };
+  const fallback: BookingConfig = { timezone: "America/Los_Angeles", booking_window_days: 21, min_notice_hours: 12 };
   if (!hasSupabase) return { config: fallback, availability: [] as AvailabilityRow[], busy: [] as Busy[] };
 
   const supabase = await createClient();

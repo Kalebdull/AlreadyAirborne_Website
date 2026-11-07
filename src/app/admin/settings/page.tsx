@@ -17,7 +17,7 @@ export default async function AdminSettingsPage() {
   return (
     <SettingsForm
       settings={{
-        timezone: settings?.timezone ?? "America/New_York",
+        timezone: settings?.timezone ?? "America/Los_Angeles",
         zoom_link: settings?.zoom_link ?? "",
         payment_instructions: settings?.payment_instructions ?? "",
         booking_window_days: settings?.booking_window_days ?? 21,

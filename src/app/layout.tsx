@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     template: "%s · AlreadyAirborne",
   },
   description:
-    "30-second explainers on the topics student pilots struggle with, plus 1-on-1 Zoom tutoring and mock oral exams with a CFI.",
+    "30-second explainers on the topics student pilots struggle with, plus 1-on-1 Zoom tutoring and mock oral exams with Kaleb Dull, a CFI in San Jose, CA.",
 };
 
 export const viewport: Viewport = {

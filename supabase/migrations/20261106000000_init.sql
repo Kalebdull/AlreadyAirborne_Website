@@ -125,7 +125,7 @@ create policy "progress: own" on public.clip_progress
 -- ---------------------------------------------------------------------------
 create table public.settings (
   id int primary key default 1 check (id = 1),
-  timezone text not null default 'America/New_York',
+  timezone text not null default 'America/Los_Angeles',
   zoom_link text,
   payment_instructions text,
   booking_window_days int not null default 21 check (booking_window_days between 1 and 120),

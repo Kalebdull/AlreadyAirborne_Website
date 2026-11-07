@@ -10,11 +10,11 @@ const TIMES = Array.from({ length: 32 }, (_, i) => {
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 });
 const ZONES = [
+  "America/Los_Angeles",
   "America/New_York",
   "America/Chicago",
   "America/Denver",
   "America/Phoenix",
-  "America/Los_Angeles",
   "America/Anchorage",
   "Pacific/Honolulu",
 ];

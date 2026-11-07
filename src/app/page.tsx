@@ -245,6 +245,7 @@ function About() {
                 {r.toUpperCase()}
               </span>
             ))}
+            <span className="rounded-full border border-edge px-3 py-1 text-soft">{instructor.location.toUpperCase()}</span>
           </div>
           <p className="text-lg leading-relaxed text-mute">{instructor.bio}</p>
           <a href={site.instagram.url} className="link text-[17px]">

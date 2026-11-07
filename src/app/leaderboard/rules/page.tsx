@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Contest rules" };
 export default async function RulesPage() {
   const { contest } = await getContest();
   const fmt = (iso?: string) =>
-    iso ? new Date(iso).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short", timeZone: "America/New_York" }) + " ET" : "[DATE]";
+    iso ? new Date(iso).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short", timeZone: site.timezone }) + " PT" : "[DATE]";
 
   const sections: [string, React.ReactNode][] = [
     [
