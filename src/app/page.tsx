@@ -4,6 +4,7 @@ import { site } from "@/lib/site";
 import { TOPICS } from "@/lib/topics";
 import { Pfd } from "@/components/pfd/pfd";
 import { RiseText } from "@/components/rise-text";
+import { HeroUntangle } from "@/components/hero-untangle";
 import { Spotlight } from "@/components/spotlight";
 import { GameSection } from "@/components/leaderboard-section";
 import { TopicMarquee } from "@/components/topic-marquee";
@@ -54,14 +55,10 @@ function ImageTreatment({ glow = true }: { glow?: boolean }) {
 
 function Hero() {
   return (
-    <section className="relative flex min-h-[620px] items-end overflow-hidden md:h-[92vh]">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/hero-approach.jpg"
-        alt="Synthetic-vision view down final approach: a magenta ring framing the runway, mountains beyond."
-        className="absolute inset-y-0 left-0 h-full w-full max-w-none object-cover object-[60%_50%] md:w-[145%] md:object-center"
-      />
-      <ImageTreatment />
+    <section className="relative flex min-h-[780px] items-end overflow-hidden md:h-[92vh] md:min-h-[640px]">
+      <HeroUntangle className="absolute inset-x-0 top-12 h-[46%] w-full object-cover object-[70%_50%] md:inset-0 md:h-full md:object-[80%_50%]" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,#000_0%,rgba(0,0,0,.85)_38%,transparent_62%)] md:bg-[linear-gradient(100deg,rgba(0,0,0,.95)_0%,rgba(0,0,0,.75)_40%,transparent_66%)]" />
+      <div aria-hidden className="grain" />
 
       <div className="absolute left-[clamp(1.25rem,4vw,4rem)] top-6 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[3px] text-soft">
         <span className="relative flex h-2 w-2">
@@ -71,8 +68,8 @@ function Hero() {
         Now on Instagram · @{site.instagram.handle}
       </div>
 
-      <div className="relative w-full pb-20 pl-[clamp(1.25rem,4vw,4rem)] pr-6 pt-32 md:pb-24">
-        <div className="flex max-w-3xl flex-col items-start gap-6">
+      <div className="pointer-events-none relative w-full pb-20 pl-[clamp(1.25rem,4vw,4rem)] pr-6 pt-32 md:pb-24">
+        <div className="pointer-events-auto flex max-w-3xl flex-col items-start gap-6">
           <span className="fade-up rounded-full bg-cyan/15 px-3.5 py-1.5 font-mono text-[11px] tracking-[.14em] text-cyan ring-1 ring-cyan/30">
             FLIGHT INSTRUCTION · {site.instructor.location.toUpperCase()} &amp; ZOOM
           </span>
@@ -82,18 +79,15 @@ function Hero() {
             </span>
             <h1 className="headline text-[clamp(3.25rem,8vw,5.5rem)] leading-[1.02]">
               <span className="block">
-                <RiseText text="Hard topics." delay={130} />
-              </span>
-              <span className="block">
-                <RiseText text="Thirty seconds." delay={230} />
+                <RiseText text="Aviation," delay={130} />
               </span>
               <span className="block text-dim">
-                <RiseText text="Then it clicks." delay={330} />
+                <RiseText text="made simple." delay={230} />
               </span>
             </h1>
           </div>
           <p className="fade-up max-w-xl text-lg leading-relaxed text-soft md:text-xl" style={{ animationDelay: "440ms" }}>
-            Short explainers on the topics student pilots struggle with, then one-on-one on Zoom with {site.instructor.name}, CFI, until it makes sense.
+            The hard topics, untangled in thirty-second clips. Then one-on-one on Zoom with {site.instructor.name}, CFI, until it clicks.
           </p>
           <div className="fade-up flex flex-wrap gap-3" style={{ animationDelay: "560ms" }}>
             <Link href="/book" className="btn btn-primary">
