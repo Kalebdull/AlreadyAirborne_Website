@@ -265,6 +265,19 @@ html {
 .reveal-stagger.is-visible > *:nth-child(5) { transition-delay: 320ms; }
 .reveal-stagger.is-visible > *:nth-child(6) { transition-delay: 400ms; }
 
+/* Topic ticker under the flight display. */
+.marquee-track {
+  animation: marquee 60s linear infinite;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 /* Hero headline: words rise out of a mask one by one. */
 .rise-word {
   animation: rise 1.1s var(--ease-out) both;
@@ -408,6 +421,7 @@ html {
   .fade-up,
   .gauge-arc,
   .teletype,
+  .marquee-track,
   .page-enter,
   .pfd-ann[data-on="true"],
   .scroll-settle {
