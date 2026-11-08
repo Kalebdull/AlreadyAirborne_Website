@@ -20,7 +20,7 @@ export default async function RulesPage() {
     ["2. No purchase necessary", "No purchase or payment of any kind is required to enter or win. A purchase does not improve your chances."],
     [
       "3. Eligibility",
-      "Open to legal residents of the 50 United States and D.C. who are 18 or older at the time of entry. Void where prohibited. Immediate family and household members of the sponsor are not eligible.",
+      "Open to legal residents of the 50 United States and D.C. who are 18 or older at the time of entry. Void where prohibited. The sponsor and the sponsor's immediate family and household members are not eligible. The sponsor's own score may appear on the leaderboard for fun but can't win.",
     ],
     [
       "4. Contest period",
@@ -34,7 +34,7 @@ export default async function RulesPage() {
     ],
     [
       "6. Winner selection",
-      "This is a contest of skill, not chance. Every score is verified by re-flying the recorded control inputs on our server. The entrant with the highest verified score at the end of the contest period wins. Ties go to the score submitted first. The sponsor may review any entry and disqualify scores it reasonably believes were not achieved fairly.",
+      "This is a contest of skill, not chance. Every score is verified by re-flying the recorded control inputs on our server. The eligible entrant with the highest verified score at the end of the contest period wins. Ties go to the score submitted first. The sponsor may review any entry and disqualify scores it reasonably believes were not achieved fairly.",
     ],
     [
       "7. Prize",
