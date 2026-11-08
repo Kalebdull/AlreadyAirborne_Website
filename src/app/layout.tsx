@@ -4,6 +4,7 @@ import { SiteHeader } from "@/components/site-header";
 import { TopBar } from "@/components/top-bar";
 import { SiteFooter } from "@/components/site-footer";
 import { Reveal } from "@/components/reveal";
+import { PageViews } from "@/components/page-views";
 import { site } from "@/lib/site";
 import "./globals.css";
 
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <div className="flex flex-1 flex-col">{children}</div>
         <SiteFooter />
         <Reveal />
+        <PageViews />
       </body>
     </html>
   );

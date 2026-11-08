@@ -2,6 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { notifyInstructor } from "@/lib/notify";
+import { site } from "@/lib/site";
 import { getViewer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { hoursFor, serviceById, ZOOM_LENGTHS } from "@/lib/services";
@@ -40,9 +43,22 @@ export async function requestBooking(_: BookingState, formData: FormData): Promi
     return { error: "Couldn't send that request. Try again in a moment." };
   }
 
+  after(() => {
+    const when = new Date(startsAt).toLocaleString("en-US", { timeZone: site.timezone, dateStyle: "full", timeStyle: "short" });
+    return notifyInstructor(
+      `New request: ${service.label}`,
+      [
+        `${viewer.fullName ?? viewer.email} (${viewer.email}) requested ${service.label}.`,
+        `When: ${when} (Pacific)`,
+        notes ? `Their note: ${notes}` : "No note.",
+      ],
+      { label: "Clear or decline it", path: "/admin/requests" },
+    );
+  });
+
   revalidatePath("/dashboard");
   revalidatePath("/book");
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   return { ok: true };
 }
 
@@ -53,5 +69,5 @@ export async function cancelBooking(id: string) {
   await supabase.from("bookings").update({ status: "cancelled" }).eq("id", id).eq("status", "pending");
   revalidatePath("/dashboard");
   revalidatePath("/book");
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
 }

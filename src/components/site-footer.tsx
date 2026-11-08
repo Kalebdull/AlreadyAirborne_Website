@@ -52,6 +52,9 @@ export function SiteFooter() {
             © {new Date().getFullYear()} {site.name} · {site.email}
           </span>
           <div className="flex gap-5">
+            <Link href="/privacy" className="press hover:text-ink">
+              Privacy
+            </Link>
             <Link href="/leaderboard/rules" className="press hover:text-ink">
               Contest rules
             </Link>

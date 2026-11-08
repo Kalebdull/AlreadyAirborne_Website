@@ -8,6 +8,7 @@ import { decode, encode, quantize, toControls, type Frame } from "./replay";
 import type { SvtScene } from "./scene";
 import { ScoreSubmit, type SubmitApi } from "./score-submit";
 import { LEVEL_COUNT, LEVELS } from "./levels";
+import { track } from "@/lib/track";
 
 // A working Garmin-style primary flight display with synthetic vision, and
 // a game: fly the magenta pathway around the traffic pattern and land as
@@ -209,11 +210,15 @@ export function Pfd() {
     let recording = true;
     let recordedRun = flight.resets;
     let pending: { replay: string } | null = null;
+    // Site stats: did someone take the controls, and how far did each run get.
+    let handsOn = false;
+    let startReported = false;
     function startRecording() {
       frames = [];
       recording = true;
       recordedRun = flight.resets;
       pending = null;
+      handsOn = false;
     }
     actionsRef.current = {
       flyAgain: () => {
@@ -408,6 +413,13 @@ export function Pfd() {
         // Keep a ranked result on screen until you choose to submit or fly again.
         const resultUp = flight.result !== null && flight.result.ranked && flight.result.score > 0 && (flight.phase === "failed" || flight.phase === "complete");
         step(flight, f.dt, toControls(f, { retry: c.retry && !holdRef.current, hold: holdRef.current || resultUp }));
+        if (flight.phase === "manual" && !handsOn && !scripted) {
+          handsOn = true;
+          if (!startReported) {
+            startReported = true;
+            track("game_start");
+          }
+        }
         if (flight.resets !== recordedRun) {
           // The run ended and reset during this step; record from the next one.
           startRecording();
@@ -415,6 +427,10 @@ export function Pfd() {
           frames.push(f);
           if (flight.phase === "failed" || flight.phase === "complete" || frames.length > 150000) {
             recording = false;
+            if (handsOn && flight.result) {
+              const r = flight.result;
+              track("run_end", { score: r.score, cleared: r.cleared, level: r.levelReached, ranked: r.ranked });
+            }
             if (flight.result?.ranked && flight.result.score > 0) {
               pending = { replay: encode(frames) };
               // Keep your record run so you can submit it any time later.

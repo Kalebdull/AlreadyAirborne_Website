@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { hasSupabase } from "@/lib/supabase/env";
+import { after } from "next/server";
+import { notifyInstructor } from "@/lib/notify";
 
 export type FormState = { error?: string; message?: string } | undefined;
 
@@ -52,6 +54,9 @@ export async function signUp(_: FormState, formData: FormData): Promise<FormStat
     },
   });
   if (error) return { error: error.message };
+  after(() =>
+    notifyInstructor("New sign-up", [`${fullName} (${email}) just created an account.`], { label: "See your students", path: "/admin/students" }),
+  );
 
   // With email confirmation on, there's no session until they click the link.
   if (!data.session) {
