@@ -8,11 +8,17 @@ import { LocalTime } from "@/components/local-time";
 import { requestTime } from "@/lib/format";
 import { CancelButton } from "./cancel-button";
 import { Greeting } from "./greeting";
+import { payBooking } from "./actions";
+import { settleCheckout, stripe } from "@/lib/stripe";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
   const viewer = await requireViewer("/dashboard");
+  // Back from Stripe Checkout: confirm with Stripe before showing "paid"
+  // (the webhook does the same; whichever lands first wins).
+  const { paid } = await searchParams;
+  const justPaid = typeof paid === "string" && (await settleCheckout(paid).catch(() => false));
   const [bookings, { topics, clips }, watched] = await Promise.all([
     getMyBookings(viewer.id),
     getLibrary(),
@@ -47,6 +53,13 @@ export default async function DashboardPage() {
           </h1>
         </div>
 
+        {justPaid && (
+          <p className="rounded-2xl bg-green/10 px-5 py-4 text-soft" role="status">
+            <span className="mr-2 font-mono text-[11px] font-bold tracking-[.08em] text-green">PAYMENT RECEIVED</span>
+            Thanks! You&apos;re all set. A receipt is on its way to your email.
+          </p>
+        )}
+
         <div className="grid gap-4 md:grid-cols-3">
           <section className="card flex flex-col gap-[22px] p-8 md:col-span-2 md:p-9">
             {nextCleared ? (
@@ -70,15 +83,16 @@ export default async function DashboardPage() {
                     {nextCleared.notes ? ` · “${nextCleared.notes}”` : ""}
                   </span>
                 </div>
-                {!nextCleared.paid && nextCleared.payment_instructions && (
+                {!nextCleared.paid && !stripe && nextCleared.payment_instructions && (
                   <p className="rounded-2xl bg-amber/10 px-5 py-4 text-[15px] leading-relaxed text-soft">
                     <span className="mb-1 block font-mono text-[11px] font-bold tracking-[.08em] text-amber">HOW TO PAY</span>
                     {nextCleared.payment_instructions}
                   </p>
                 )}
                 <div className="mt-auto flex flex-wrap gap-3">
+                  {!nextCleared.paid && stripe && <PayButton id={nextCleared.id} amount={formatPrice(nextCleared.price_cents)} primary />}
                   {nextCleared.zoom_link && (
-                    <a href={nextCleared.zoom_link} className="btn btn-primary" target="_blank" rel="noreferrer">
+                    <a href={nextCleared.zoom_link} className={`btn ${!nextCleared.paid && stripe ? "btn-ghost" : "btn-primary"}`} target="_blank" rel="noreferrer">
                       Join Zoom
                     </a>
                   )}
@@ -160,6 +174,7 @@ export default async function DashboardPage() {
                     </span>
                     <span>
                       {b.status === "pending" && !past ? <CancelButton id={b.id} /> : null}
+                      {b.status === "cleared" && !b.paid && stripe && b.id !== nextCleared?.id ? <PayButton id={b.id} amount={formatPrice(b.price_cents)} /> : null}
                     </span>
                     <span className="justify-self-end">
                       <StatusChip status={b.status} />
@@ -198,5 +213,18 @@ function Gauge({ pct }: { pct: number }) {
         <span className="headline text-[44px]">{pct}%</span>
       </div>
     </div>
+  );
+}
+
+// Opens Stripe Checkout for one confirmed session (see ./actions.ts).
+function PayButton({ id, amount, primary }: { id: string; amount: string; primary?: boolean }) {
+  return (
+    <form action={payBooking}>
+      <input type="hidden" name="id" value={id} />
+      <button type="submit" className={primary ? "btn btn-primary" : "link text-[14px]"}>
+        Pay {amount}
+        {primary ? <span className="ml-1.5 font-mono text-[11px] opacity-70">CARD · APPLE PAY</span> : " ›"}
+      </button>
+    </form>
   );
 }

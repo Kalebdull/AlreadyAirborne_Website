@@ -31,6 +31,8 @@ export type Booking = {
   zoom_link: string | null;
   payment_instructions: string | null;
   admin_note: string | null;
+  stripe_session_id?: string | null; // set when paid by card through Stripe
+  paid_at?: string | null;
   created_at: string;
 };
 

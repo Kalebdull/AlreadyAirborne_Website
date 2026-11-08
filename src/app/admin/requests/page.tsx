@@ -87,7 +87,7 @@ function Group({
               <div className="flex min-w-0 flex-[1_1_380px] flex-col gap-1.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusChip status={b.status} />
-                  {b.status === "cleared" && (b.paid ? <Chip tone="paid">Paid</Chip> : <Chip tone="due">Unpaid</Chip>)}
+                  {b.status === "cleared" && (b.paid ? <Chip tone="paid">{b.stripe_session_id ? "Paid · card" : "Paid"}</Chip> : <Chip tone="due">Unpaid</Chip>)}
                   <span className="font-mono text-xs text-dim">{formatPrice(b.price_cents)}</span>
                 </div>
                 <span className={`font-display font-semibold ${compact ? "text-lg" : "text-[22px]"}`}>
