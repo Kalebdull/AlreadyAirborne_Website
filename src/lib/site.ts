@@ -10,8 +10,8 @@ export const site = {
     photoAlt: "Kaleb Dull (right) shaking hands on the ramp in front of a Cessna 172",
   },
   instagram: {
-    handle: "[handle]",
-    url: "https://instagram.com/[handle]",
+    handle: "alreadyairborne",
+    url: "https://www.instagram.com/alreadyairborne/",
   },
   email: "alreadyairborne@gmail.com",
   timezone: "America/Los_Angeles",
