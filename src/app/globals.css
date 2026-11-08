@@ -542,3 +542,11 @@ html {
     animation-delay: 0s !important;
   }
 }
+
+/* Hero loop: never show the browser's play overlay (iOS Low Power Mode). */
+.hero-video::-webkit-media-controls,
+.hero-video::-webkit-media-controls-start-playback-button,
+.hero-video::-webkit-media-controls-overlay-play-button {
+  display: none !important;
+  -webkit-appearance: none;
+}

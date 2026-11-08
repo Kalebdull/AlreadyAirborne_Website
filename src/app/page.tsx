@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { getLibrary } from "@/lib/data";
 import { site } from "@/lib/site";
-import { TOPICS } from "@/lib/topics";
 import { Pfd } from "@/components/pfd/pfd";
 import { RiseText } from "@/components/rise-text";
 import { HeroUntangle } from "@/components/hero-untangle";
@@ -15,11 +13,7 @@ import { BulbIcon, ClipboardIcon, PlayIcon, VideoIcon } from "@/components/icons
 
 // Section order follows the Prestige layout kit; colors, type and components
 // are this site's own (src/app/globals.css, design/README.md).
-export default async function Home() {
-  const { topics, clips } = await getLibrary();
-  const counts = new Map<string, number>();
-  for (const t of topics) counts.set(t.slug, clips.filter((c) => c.topic_id === t.id).length);
-
+export default function Home() {
   return (
     <main>
       <Hero />
@@ -33,7 +27,6 @@ export default async function Home() {
       </GameSection>
       <Pricing />
       <HowItWorks />
-      <Library counts={counts} hasLibrary={topics.length > 0} />
       <Faq />
       <Cta />
     </main>
@@ -56,7 +49,7 @@ function ImageTreatment({ glow = true }: { glow?: boolean }) {
 function Hero() {
   return (
     <section className="relative flex min-h-[780px] items-end overflow-hidden md:h-[92vh] md:min-h-[640px]">
-      <HeroUntangle className="absolute inset-x-0 top-12 h-[46%] w-full object-cover object-[70%_50%] md:inset-0 md:h-full md:object-[80%_50%]" />
+      <HeroUntangle className="absolute inset-x-0 top-6 h-[42%] w-full object-[94%_50%] [mask-image:linear-gradient(to_bottom,black_62%,transparent_96%)] md:[mask-image:none] md:inset-0 md:h-full md:object-[80%_50%]" />
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,#000_0%,rgba(0,0,0,.85)_38%,transparent_62%)] md:bg-[linear-gradient(100deg,rgba(0,0,0,.95)_0%,rgba(0,0,0,.75)_40%,transparent_66%)]" />
       <div aria-hidden className="grain" />
 
@@ -326,7 +319,7 @@ function PriceCard(props: {
   );
 }
 
-// --- 9. Details: how it works, the library ---------------------------------------
+// --- 9. Details: how it works ---------------------------------------------------
 
 function HowItWorks() {
   const steps = [
@@ -356,80 +349,6 @@ function HowItWorks() {
             </li>
           ))}
         </ol>
-      </div>
-    </section>
-  );
-}
-
-function Library({ counts, hasLibrary }: { counts: Map<string, number>; hasLibrary: boolean }) {
-  const label = (slug: string) => {
-    const n = hasLibrary ? (counts.get(slug) ?? 0) : 0;
-    return n ? `${n} ${n === 1 ? "CLIP" : "CLIPS"}` : "COMING SOON";
-  };
-  const [featured, ...rest] = TOPICS;
-  return (
-    <section id="library" className="scroll-mt-20 px-6 py-14 md:py-20">
-      <div className="mx-auto flex max-w-[1180px] flex-col gap-9 md:gap-10">
-        <SectionHeader
-          eyebrow="The library"
-          title={
-            <>
-              Every reel, organized. <span className="text-dim">Free with an account.</span>
-            </>
-          }
-          intro="What each topic covers, so you can find the thing you're stuck on."
-        />
-
-        <div className="reveal-stagger grid gap-4 md:grid-cols-3 md:grid-rows-2">
-          <Link
-            href={`/library#${featured.slug}`}
-            className="card-lift accent-bar relative flex min-h-[320px] flex-col justify-between overflow-hidden rounded-[28px] bg-card p-8 md:row-span-2"
-            style={{ ["--bar" as string]: "var(--color-magenta)" }}
-          >
-            <div aria-hidden className="absolute -right-16 -top-16 h-64 w-64 rounded-full border-[14px] border-magenta/20" />
-            <div aria-hidden className="absolute -right-4 -top-4 h-40 w-40 rounded-full border-[10px] border-magenta/35" />
-            <span className="relative font-mono text-xs tracking-[.12em] text-magenta">● {label(featured.slug)}</span>
-            <div className="relative flex flex-col gap-4">
-              <span className="font-display text-[34px] font-bold leading-tight tracking-[-.02em] md:text-[40px]">{featured.name}</span>
-              <span className="text-[16px] text-mute">{"blurb" in featured ? featured.blurb : ""}</span>
-              <ul className="flex flex-wrap gap-2">
-                {featured.covers.map((c) => (
-                  <li key={c} className="rounded-full bg-white/5 px-3 py-1 text-[13px] text-soft ring-1 ring-white/10">
-                    {c}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </Link>
-          {rest.map((t) => (
-            <Link key={t.slug} href={`/library#${t.slug}`} className="card-lift accent-bar flex flex-col gap-5 rounded-[28px] bg-card p-7">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="font-display text-[24px] font-semibold">{t.name}</span>
-                <span className="whitespace-nowrap font-mono text-[11px] text-cyan">{label(t.slug)}</span>
-              </div>
-              <ul className="flex flex-col gap-1.5 text-[15px] text-mute">
-                {t.covers.map((c) => (
-                  <li key={c} className="flex gap-2">
-                    <span className="text-dim" aria-hidden>
-                      —
-                    </span>
-                    {c}
-                  </li>
-                ))}
-              </ul>
-            </Link>
-          ))}
-          <a
-            href={site.instagram.url}
-            className="card-lift flex flex-col justify-between gap-5 rounded-[28px] p-7 shadow-[inset_0_0_0_1px_rgba(34,211,238,.35)] md:col-span-2"
-          >
-            <span className="font-mono text-[11px] tracking-[.12em] text-cyan">REQUEST A TOPIC</span>
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <span className="max-w-[420px] font-display text-[24px] font-semibold leading-snug">Stuck on something that isn&apos;t here? Tell me what to make next.</span>
-              <span className="link whitespace-nowrap text-[15px]">Message on Instagram ›</span>
-            </div>
-          </a>
-        </div>
       </div>
     </section>
   );
