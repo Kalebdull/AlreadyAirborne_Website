@@ -4,8 +4,6 @@ import { site } from "@/lib/site";
 
 export const metadata: Metadata = { title: "Contest rules" };
 
-// A starting template. Fill in the bracketed parts and have someone review
-// it before announcing a prize.
 export default async function RulesPage() {
   const { contest } = await getContest();
   const fmt = (iso?: string) =>
@@ -22,7 +20,7 @@ export default async function RulesPage() {
     ["2. No purchase necessary", "No purchase or payment of any kind is required to enter or win. A purchase does not improve your chances."],
     [
       "3. Eligibility",
-      "Open to legal residents of [the 50 United States and D.C.] who are [18] or older at the time of entry. Void where prohibited. [Immediate family and household members of the sponsor are not eligible.]",
+      "Open to legal residents of the 50 United States and D.C. who are 18 or older at the time of entry. Void where prohibited. Immediate family and household members of the sponsor are not eligible.",
     ],
     [
       "4. Contest period",
@@ -41,13 +39,13 @@ export default async function RulesPage() {
     [
       "7. Prize",
       <>
-        One prize: {contest?.prize ?? "[PRIZE]"}. Approximate retail value: [$VALUE]. No cash alternative. The prize is not transferable [and must be redeemed
-        by DATE].
+        One prize: {contest?.prize ?? "[PRIZE]"}. Approximate retail value: $50. No cash alternative. The prize is not transferable and must be scheduled within 90 days of the winner
+        accepting it.
       </>,
     ],
     [
       "8. Winner notification",
-      "The winner will be contacted at the email address submitted within [7] days after the contest ends and must respond within [7] days, or an alternate winner (the next highest verified score) may be selected.",
+      "The winner will be contacted at the email address submitted within 7 days after the contest ends and must respond within 7 days, or an alternate winner (the next highest verified score) may be selected.",
     ],
     [
       "9. Privacy",
