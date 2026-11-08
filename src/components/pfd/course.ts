@@ -65,7 +65,7 @@ export function buildCourse(opts: {
   }
 
   const course: Course = { path, length, rings: [], thresholdS };
-  const first = 700;
+  const first = 1200; // a few seconds to settle in before the first ring
   const lastRing = thresholdS - 350;
   for (let i = 0; i < opts.rings; i++) {
     const s = opts.rings === 1 ? lastRing : first + ((lastRing - first) * i) / (opts.rings - 1);

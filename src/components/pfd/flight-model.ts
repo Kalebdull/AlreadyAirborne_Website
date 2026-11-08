@@ -176,12 +176,17 @@ function loadLevel(s: FlightState, index: number) {
   const pitch = fpa + aoa - INCIDENCE;
   const throttle = clamp((drag(ias, flaps) + G_K * Math.sin(fpa * deg)) / thrustMax(ias), 0, 1);
   const alt = terrainHeight(a.x, a.z) + a.agl;
+  // Start already crabbed into the wind, so the first seconds track the path
+  // instead of drifting off it before you've had a chance to correct.
+  const wind = windAt(level, 0);
+  const cross = wind.vx * Math.cos(track * deg) + wind.vz * Math.sin(track * deg);
+  const hdg = (((track + Math.asin(clamp(-cross / (ias * 1.68781), -0.5, 0.5)) / deg) % 360) + 360) % 360;
   Object.assign(s, {
     levelIndex: index, phase: "intro", phaseTime: 0, runTime: 0, airborne: true,
     x: a.x, z: a.z, alt, pitch, roll: 0, pitchRate: 0, rollRate: 0,
-    ias, vs: ias * 101.27 * Math.sin(fpa * deg), hdg: track, aoa, throttle, throttleCmd: throttle,
+    ias, vs: ias * 101.27 * Math.sin(fpa * deg), hdg, aoa, throttle, throttleCmd: throttle,
     flaps, flapsCmd: flaps, trimPitch: pitch, pathS: 0, rollTarget: 0, altSel: Math.round(alt / 100) * 100,
-    hdgSel: track, speedTrend: 0, vfeTimer: 0,
+    hdgSel: hdg, speedTrend: 0, vfeTimer: 0,
     rings: course.rings.map(() => ({ status: "pending" as const, at: 0 })), nextRing: 0, ringPoints: 0, warnTime: 0,
     failure: null,
   });
@@ -348,7 +353,8 @@ function physics(s: FlightState, h: number, hReal: number, c: Controls) {
   const wind = windAt(level, s.runTime);
   if (s.airborne) {
     const t = s.runTime;
-    const gust = wind.speed / 14;
+    // Bumps build over the first few seconds instead of hitting at load-in.
+    const gust = (wind.speed / 14) * Math.min(1, t / 6);
     s.rollRate += gust * (9 * Math.sin(t * 1.31) + 6 * Math.sin(t * 2.37 + 2.1)) * h;
     s.pitchRate += gust * (2.6 * Math.sin(t * 1.07 + 1.1) + 1.6 * Math.sin(t * 2.11)) * h;
   }

@@ -5,7 +5,7 @@
 // Units are feet. +x is east, -z is north (Three.js camera convention), and
 // heading is degrees clockwise from north.
 
-export const FIELD = 820; // field elevation, ft MSL
+export const FIELD = 0; // field elevation, ft MSL (sea level, so the altimeter reads height above the runway)
 
 export const RUNWAY = {
   west: -2600,
