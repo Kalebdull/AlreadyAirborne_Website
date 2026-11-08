@@ -153,8 +153,8 @@ function Mission() {
   ];
   const { instructor } = site;
   return (
-    <section id="about" className="scroll-mt-20 px-6 py-20 md:py-24">
-      <div className="mx-auto flex max-w-[1180px] flex-col gap-12">
+    <section id="about" className="scroll-mt-20 px-6 py-14 md:py-20">
+      <div className="mx-auto flex max-w-[1180px] flex-col gap-9 md:gap-10">
         <SectionHeader
           eyebrow="Why I teach this way"
           rule
@@ -166,24 +166,24 @@ function Mission() {
           intro="I started making these videos to get better at teaching: every one is me hunting for the relatable idea that makes a hard topic land. Sessions work the same way."
         />
 
-        <div className="reveal-stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="reveal-stagger grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
           {pillars.map(({ title, body, color, text, Icon }) => (
             <div
               key={title}
-              className="accent-bar relative flex flex-col gap-4 rounded-3xl bg-card p-7 ring-1 ring-white/5"
+              className="accent-bar relative flex flex-col gap-3 rounded-3xl bg-card p-5 ring-1 ring-white/5 md:gap-4 md:p-7"
               style={{ ["--bar" as string]: color }}
             >
               <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 ${text}`}>
                 <Icon className="h-5 w-5" />
               </span>
-              <span className="font-display text-xl font-semibold tracking-[-.01em]">{title}</span>
-              <span className="text-[15px] leading-relaxed text-mute">{body}</span>
+              <span className="font-display text-lg font-semibold leading-tight tracking-[-.01em] md:text-xl">{title}</span>
+              <span className="text-[13px] leading-relaxed text-mute md:text-[15px]">{body}</span>
             </div>
           ))}
         </div>
 
         <div className="card reveal flex flex-col overflow-hidden md:flex-row">
-          <div className="relative flex aspect-[4/5] overflow-hidden bg-raised md:aspect-auto md:min-h-[520px] md:basis-[44%]">
+          <div className="relative flex aspect-[4/3] overflow-hidden bg-raised md:aspect-auto md:min-h-[520px] md:basis-[44%]">
             {instructor.photo && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={instructor.photo} alt={instructor.photoAlt} className="absolute inset-0 h-full w-full object-cover object-[60%_35%]" />
@@ -222,8 +222,8 @@ function Mission() {
 
 function Pricing() {
   return (
-    <section id="sessions" className="scroll-mt-20 border-t border-line bg-[#050506] px-6 py-20 md:py-24">
-      <div className="mx-auto flex max-w-[1180px] flex-col gap-14">
+    <section id="sessions" className="scroll-mt-20 border-t border-line bg-[#050506] px-6 py-14 md:py-20">
+      <div className="mx-auto flex max-w-[1180px] flex-col gap-9 md:gap-10">
         <SectionHeader
           eyebrow="Work with me"
           title={
@@ -335,8 +335,8 @@ function HowItWorks() {
     { n: "03", tag: "Join", title: "Hop on Zoom.", body: "The link is one tap away when it's time. Bring your questions.", color: "var(--color-cyan)", text: "text-cyan" },
   ];
   return (
-    <section className="border-t border-line bg-[#050506] px-6 pb-20 md:pb-24">
-      <div className="mx-auto flex max-w-[1180px] flex-col gap-12 pt-20 md:pt-24">
+    <section className="border-t border-line bg-[#050506] px-6 pb-14 md:pb-20">
+      <div className="mx-auto flex max-w-[1180px] flex-col gap-9 pt-14 md:gap-10 md:pt-20">
         <SectionHeader
           eyebrow="How it works"
           title={
@@ -368,8 +368,8 @@ function Library({ counts, hasLibrary }: { counts: Map<string, number>; hasLibra
   };
   const [featured, ...rest] = TOPICS;
   return (
-    <section id="library" className="scroll-mt-20 px-6 py-20 md:py-24">
-      <div className="mx-auto flex max-w-[1180px] flex-col gap-12">
+    <section id="library" className="scroll-mt-20 px-6 py-14 md:py-20">
+      <div className="mx-auto flex max-w-[1180px] flex-col gap-9 md:gap-10">
         <SectionHeader
           eyebrow="The library"
           title={
@@ -439,7 +439,7 @@ function Library({ counts, hasLibrary }: { counts: Map<string, number>; hasLibra
 
 function Cta() {
   return (
-    <section className="relative overflow-hidden border-t border-line bg-[#050608] px-6 py-24 md:py-28">
+    <section className="relative overflow-hidden border-t border-line bg-[#050608] px-6 py-16 md:py-20">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/hero-approach.jpg" alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover opacity-25" />
       <ImageTreatment />

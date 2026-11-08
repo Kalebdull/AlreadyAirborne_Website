@@ -50,6 +50,8 @@ export function Pfd() {
     const el = root.current;
     if (!el) return;
     const q = <T extends HTMLElement | SVGElement>(name: string) => el.querySelector<T>(`[data-pfd="${name}"]`)!;
+    // Power and flaps show in two places: on the display, and in the phone deck.
+    const qa = <T extends HTMLElement>(name: string) => [...el.querySelectorAll<T>(`[data-pfd="${name}"]`)];
     const parts = {
       svt: q<HTMLDivElement>("svt"),
       attitude: q<HTMLDivElement>("attitude"),
@@ -80,10 +82,10 @@ export function Pfd() {
       annTerrain: q<HTMLDivElement>("ann-terrain"),
       toast: q<HTMLDivElement>("toast"),
       fade: q<HTMLDivElement>("fade"),
-      pwrFill: q<HTMLDivElement>("pwr-fill"),
-      pwrText: q<HTMLSpanElement>("pwr-text"),
-      flapPointer: q<HTMLDivElement>("flap-pointer"),
-      flapText: q<HTMLSpanElement>("flap-text"),
+      pwrFill: qa<HTMLDivElement>("pwr-fill"),
+      pwrText: qa<HTMLSpanElement>("pwr-text"),
+      flapPointer: qa<HTMLDivElement>("flap-pointer"),
+      flapText: qa<HTMLSpanElement>("flap-text"),
       best: q<HTMLSpanElement>("best"),
       bestPanel: q<HTMLButtonElement>("best-panel"),
       runType: q<HTMLSpanElement>("run-type"),
@@ -105,7 +107,8 @@ export function Pfd() {
       cardStats: q<HTMLDivElement>("card-stats"),
       cardSubmit: q<HTMLButtonElement>("card-submit"),
       cardHint: q<HTMLSpanElement>("card-hint"),
-      touchToggle: q<HTMLButtonElement>("touch-toggle"),
+      yoke: q<HTMLDivElement>("yoke"),
+      yokeKnob: q<HTMLDivElement>("yoke-knob"),
     };
     const fallback = el.querySelectorAll<HTMLElement>('[data-pfd="fallback"]');
 
@@ -126,8 +129,9 @@ export function Pfd() {
       hoverSince: -1, // when the mouse entered the display (-1: not over it)
       engaged: false, // you have the controls (until you press A or go idle)
       lastInput: -Infinity,
-      touchFlying: false,
-      touching: false,
+      padActive: false, // a thumb is on the phone yoke pad
+      padX: 0,
+      padY: 0,
       stickX: 0, // filtered
       stickY: 0,
       throttleHeld: 0, // from on-screen buttons
@@ -151,22 +155,22 @@ export function Pfd() {
     function release(message?: string) {
       if (!input.engaged) return;
       input.engaged = false;
-      input.touchFlying = false;
-      parts.svt.style.touchAction = "";
       if (message) flight.toast = { text: message, tone: "cyan", at: flight.time };
     }
 
     function controls(now: number, dt: number): Controls {
       if (input.hoverSince >= 0 && now - input.hoverSince > ENGAGE_DELAY) engage(now);
       // Walk away for a while and the autopilot takes back over.
-      if (input.engaged && input.hoverSince < 0 && !input.touching && now - input.lastInput > IDLE_RELEASE) {
+      if (input.engaged && input.hoverSince < 0 && !input.padActive && now - input.lastInput > IDLE_RELEASE) {
         release("AUTOPILOT ENGAGED · YOU LET GO");
       }
 
-      // Over the display (or touching it) the stick follows you; off it, the
-      // stick eases back to neutral: wings level, nose on the horizon.
+      // Over the display (or a thumb on the pad) the stick follows you; off
+      // it, the stick eases back to neutral: wings level, nose on the horizon.
       let target = { x: 0, y: 0 };
-      if (input.engaged && (input.hoverSince >= 0 || input.touching)) {
+      if (input.engaged && input.padActive) {
+        target = { x: input.padX, y: input.padY };
+      } else if (input.engaged && input.hoverSince >= 0) {
         const rect = parts.svt.getBoundingClientRect();
         target = {
           x: Math.max(-1, Math.min(1, (input.pointerX - (rect.left + rect.width / 2)) / (rect.width / 2))),
@@ -333,8 +337,8 @@ export function Pfd() {
       const hdgDiff = ((s.hdgSel - s.hdg + 540) % 360) - 180;
       parts.hdgBug.style.transform = `translateX(${hdgDiff * PPH}px)`;
       parts.fade.style.opacity = String(s.fade);
-      parts.pwrFill.style.transform = `scaleY(${s.throttle})`;
-      parts.flapPointer.style.transform = `translateY(${(s.flaps / 30) * 100}%)`;
+      for (const p of parts.pwrFill) p.style.transform = `scaleY(${s.throttle})`;
+      for (const p of parts.flapPointer) p.style.transform = `translateY(${(s.flaps / 30) * 100}%)`;
 
       svt?.update(s, r);
       renderCard(s);
@@ -346,7 +350,7 @@ export function Pfd() {
       const text = [
         r.iasText, r.altText, r.hdgText, r.vsText, modeLabel(s), s.phase, s.altSel, r.ringsText, s.levelIndex, s.runScore, r.windSpeed, r.windFrom,
         r.stallWarning, r.vfeWarning, r.overspeedWarning, r.terrainWarning,
-        Math.round(s.throttle * 100), s.flapsCmd, s.best, input.touchFlying, showToast ? s.toast!.at : "", s.apUsed, s.airborne, Boolean(bestRun),
+        Math.round(s.throttle * 100), s.flapsCmd, s.best, showToast ? s.toast!.at : "", s.apUsed, s.airborne, Boolean(bestRun),
       ].join("|");
       if (text !== lastText) {
         lastText = text;
@@ -369,8 +373,8 @@ export function Pfd() {
         parts.annVfe.dataset.on = String(r.vfeWarning);
         parts.annOverspeed.dataset.on = String(r.overspeedWarning);
         parts.annTerrain.dataset.on = String(r.terrainWarning);
-        parts.pwrText.textContent = `${Math.round(s.throttle * 100)}%`;
-        parts.flapText.textContent = `${s.flapsCmd}°`;
+        for (const p of parts.pwrText) p.textContent = `${Math.round(s.throttle * 100)}%`;
+        for (const p of parts.flapText) p.textContent = `${s.flapsCmd}°`;
         parts.best.textContent = s.best === null ? "—" : s.best.toLocaleString();
         parts.bestRank.textContent = s.best === null ? "PRESS R TO START A RUN" : bestRun ? "SUBMIT RECORD ›" : "BEST RUN";
         parts.bestPanel.disabled = !bestRun;
@@ -378,8 +382,6 @@ export function Pfd() {
         parts.runType.textContent = s.phase === "manual" ? (s.apUsed ? "PRACTICE" : "RANKED RUN") : "";
         parts.runType.dataset.kind = s.phase === "manual" && !s.apUsed ? "scored" : "practice";
         parts.runType.hidden = !flying || s.phase !== "manual";
-        parts.touchToggle.textContent = input.touchFlying ? "AP" : "FLY";
-        parts.touchToggle.dataset.on = String(input.touchFlying);
         if (showToast) {
           parts.toast.textContent = s.toast!.text;
           parts.toast.dataset.tone = s.toast!.tone;
@@ -500,14 +502,48 @@ export function Pfd() {
     const onLeaveWindow = () => {
       input.hoverSince = -1;
     };
-    // Touch: once FLY is on, drag on the display to steer.
-    const onTouch = (e: PointerEvent) => {
-      if (e.pointerType === "mouse" || !input.touchFlying) return;
-      if ((e.target as HTMLElement).closest("button")) return;
-      input.touching = e.type !== "pointerup" && e.type !== "pointercancel";
-      input.pointerX = e.clientX;
-      input.pointerY = e.clientY;
+    // Phone yoke pad, under the display so your thumb never covers the view.
+    // Where your thumb lands is center; drag from there. Let go and the
+    // stick eases back to wings level.
+    let padPointer = -1;
+    let padOrigin = { x: 0, y: 0 };
+    // How far your thumb moves for full deflection; the knob stays inside the pad.
+    const padReach = () => Math.max(50, Math.min(70, Math.min(parts.yoke.clientWidth, parts.yoke.clientHeight) / 2 - 20));
+    const onPad = (e: PointerEvent) => {
+      if (e.type === "pointerdown") {
+        if (padPointer !== -1) return;
+        e.preventDefault();
+        padPointer = e.pointerId;
+        parts.yoke.setPointerCapture(e.pointerId);
+        padOrigin = { x: e.clientX, y: e.clientY };
+        input.padActive = true;
+        input.padX = input.padY = 0;
+        parts.yoke.dataset.active = "true";
+        engage(performance.now());
+        return;
+      }
+      if (e.pointerId !== padPointer) return;
+      if (e.type === "pointermove") {
+        const reach = padReach();
+        let dx = (e.clientX - padOrigin.x) / reach;
+        let dy = (e.clientY - padOrigin.y) / reach;
+        const len = Math.hypot(dx, dy);
+        if (len > 1) {
+          dx /= len;
+          dy /= len;
+        }
+        input.padX = dx;
+        input.padY = dy;
+        input.lastInput = performance.now();
+        parts.yokeKnob.style.transform = `translate(${dx * reach}px, ${dy * reach}px)`;
+        return;
+      }
+      padPointer = -1;
+      input.padActive = false;
+      input.padX = input.padY = 0;
       input.lastInput = performance.now();
+      parts.yoke.dataset.active = "false";
+      parts.yokeKnob.style.transform = "";
     };
     const armed = () => input.engaged || input.hoverSince >= 0 || visible;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -582,22 +618,22 @@ export function Pfd() {
         submitRef.current?.open({ result: flight.result, replay: pending.replay });
         lastCard = "";
       }
-      if (action === "touch-toggle") {
-        if (input.touchFlying) {
-          release("AUTOPILOT ENGAGED");
-        } else {
-          input.touchFlying = true;
-          input.touching = false;
-          parts.svt.style.touchAction = "none";
-          engage(performance.now());
+      if (action === "autopilot") release("AUTOPILOT ENGAGED");
+      if (action === "new-run") {
+        // Same as R: a fresh scored run from the runway.
+        engage(performance.now());
+        input.retry = true;
+        if (flight.phase === "manual" || flight.phase === "ap") {
+          restart(flight);
+          startRecording();
         }
       }
     };
 
-    const touchTypes = ["pointerdown", "pointermove", "pointerup", "pointercancel"];
+    const padTypes = ["pointerdown", "pointermove", "pointerup", "pointercancel", "lostpointercapture"];
     window.addEventListener("pointermove", onPointer, { passive: true });
     document.documentElement.addEventListener("pointerleave", onLeaveWindow);
-    touchTypes.forEach((type) => parts.svt.parentElement!.addEventListener(type, onTouch as EventListener, { passive: true }));
+    padTypes.forEach((type) => parts.yoke.addEventListener(type, onPad as EventListener));
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("blur", onBlur);
@@ -626,7 +662,7 @@ export function Pfd() {
       resizeObserver?.disconnect();
       window.removeEventListener("pointermove", onPointer);
       document.documentElement.removeEventListener("pointerleave", onLeaveWindow);
-      touchTypes.forEach((type) => parts.svt.parentElement?.removeEventListener(type, onTouch as EventListener));
+      padTypes.forEach((type) => parts.yoke.removeEventListener(type, onPad as EventListener));
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
@@ -687,7 +723,7 @@ export function Pfd() {
           </div>
 
           {/* Attitude + tapes */}
-          <div className="relative aspect-[4/5] sm:aspect-[16/10] md:aspect-[16/9]">
+          <div className="relative aspect-[4/5] sm:aspect-[16/10] md:aspect-[16/9] [@media(pointer:coarse)_and_(max-width:639px)]:aspect-square">
             <div className="absolute inset-0 overflow-hidden bg-[#3d86e6] [container-type:size]" style={{ ["--ppd" as string]: "2.6cqh" }}>
               {/* Synthetic vision (3D), fades in once loaded */}
               <div data-pfd="svt" data-ready="false" className="absolute inset-0 opacity-0 transition-opacity duration-700 data-[ready=true]:opacity-100" />
@@ -825,62 +861,8 @@ export function Pfd() {
                 <span data-pfd="hdg-text">090°</span>
               </div>
 
-              {/* Power + flaps: the airplane's real controls */}
-              <div className="absolute bottom-3 left-3 flex items-stretch gap-1.5 rounded-xl bg-black/60 p-1.5 font-mono ring-1 ring-white/15 backdrop-blur md:bottom-6 md:left-6 md:gap-2 md:p-2">
-                <div className="flex flex-col items-center gap-1">
-                  <span className="text-[9px] tracking-[.12em] text-dim md:text-[10px]">PWR</span>
-                  <div className="relative h-12 w-2.5 overflow-hidden rounded-full bg-white/10 md:h-16">
-                    <div data-pfd="pwr-fill" className="absolute inset-0 origin-bottom bg-green" style={{ transform: `scaleY(${INITIAL.throttle})` }} />
-                  </div>
-                  <span data-pfd="pwr-text" className="text-[10px] tabular-nums text-ink md:text-[11px]">
-                    100%
-                  </span>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <button type="button" data-hold="1" aria-label="More power (W)" className="pfd-key">
-                    +
-                  </button>
-                  <button type="button" data-hold="-1" aria-label="Less power (S)" className="pfd-key">
-                    −
-                  </button>
-                </div>
-                <div className="mx-0.5 w-px bg-white/10" />
-                <div className="flex flex-col items-center gap-1">
-                  <span className="text-[9px] tracking-[.12em] text-dim md:text-[10px]">FLAPS</span>
-                  <div className="relative h-12 w-7 md:h-16">
-                    {[0, 10, 20, 30].map((f) => (
-                      <span key={f} className="absolute left-0 -translate-y-1/2 text-[8px] text-dim md:text-[9px]" style={{ top: `${(f / 30) * 100}%` }}>
-                        {f}
-                      </span>
-                    ))}
-                    <div className="absolute inset-y-0 right-0 w-0">
-                      <div data-pfd="flap-pointer" className="absolute inset-x-0 top-0 h-full will-change-transform">
-                        <div className="-ml-2 -mt-[5px] h-0 w-0 border-y-[5px] border-r-[8px] border-y-transparent border-r-cyan" />
-                      </div>
-                    </div>
-                  </div>
-                  <span data-pfd="flap-text" className="text-[10px] tabular-nums text-ink md:text-[11px]">
-                    0°
-                  </span>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <button type="button" data-action="flaps-up" aria-label="Flaps up (V)" className="pfd-key">
-                    ▲
-                  </button>
-                  <button type="button" data-action="flaps-down" aria-label="Flaps down (F)" className="pfd-key">
-                    ▼
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  data-pfd="touch-toggle"
-                  data-action="touch-toggle"
-                  data-on="false"
-                  className="pfd-key hidden !h-auto !w-12 self-stretch text-[11px] tracking-[.08em] data-[on=true]:!bg-cyan data-[on=true]:!text-black [@media(pointer:coarse)]:flex"
-                >
-                  FLY
-                </button>
-              </div>
+              {/* Power + flaps: the airplane's real controls (phones use the deck below) */}
+              <PowerFlaps className="absolute bottom-3 left-3 flex items-stretch gap-1.5 rounded-xl bg-black/60 p-1.5 font-mono ring-1 ring-white/15 backdrop-blur md:bottom-6 md:left-6 md:gap-2 md:p-2 [@media(pointer:coarse)]:hidden" />
 
               {/* Personal best */}
               <button
@@ -992,6 +974,39 @@ export function Pfd() {
             </div>
           </div>
 
+          {/* Phone deck: thumbs go here, under the display, not on it */}
+          <div className="hidden grid-cols-2 gap-2 border-t border-white/10 bg-[#0b0b0c] p-2 [@media(pointer:coarse)]:grid">
+            <div className="flex flex-col gap-2">
+              <PowerFlaps big className="flex flex-1 items-stretch justify-between gap-1 rounded-xl bg-white/[.04] px-1.5 py-2 font-mono ring-1 ring-white/10" />
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" data-action="new-run" className="pfd-key !h-10 !w-auto px-2 text-[11px] tracking-[.08em] !text-magenta">
+                  NEW RUN
+                </button>
+                <button type="button" data-action="autopilot" className="pfd-key !h-10 !w-auto px-2 text-[11px] tracking-[.08em] !text-green">
+                  AUTOPILOT
+                </button>
+              </div>
+            </div>
+            <div
+              data-pfd="yoke"
+              data-active="false"
+              aria-label="Yoke: put your thumb here and drag to bank and pitch"
+              className="group relative flex min-h-[170px] touch-none items-center justify-center overflow-hidden rounded-xl bg-white/[.04] ring-1 ring-white/10 transition-colors data-[active=true]:bg-cyan/[.07] data-[active=true]:ring-cyan/40"
+            >
+              <div aria-hidden className="pointer-events-none absolute inset-x-4 top-1/2 h-px bg-white/10" />
+              <div aria-hidden className="pointer-events-none absolute inset-y-4 left-1/2 w-px bg-white/10" />
+              <div aria-hidden className="pointer-events-none absolute h-[70%] max-h-[140px] w-[70%] max-w-[140px] rounded-full ring-1 ring-white/10" />
+              <div
+                data-pfd="yoke-knob"
+                aria-hidden
+                className="pointer-events-none relative h-14 w-14 rounded-full bg-white/10 ring-2 ring-white/25 transition-transform duration-200 ease-out group-data-[active=true]:bg-cyan/25 group-data-[active=true]:ring-cyan group-data-[active=true]:transition-none"
+              />
+              <span className="pointer-events-none absolute bottom-2 font-mono text-[10px] tracking-[.12em] text-dim group-data-[active=true]:opacity-0">
+                THUMB HERE TO FLY
+              </span>
+            </div>
+          </div>
+
           {/* Softkeys: these actually navigate */}
           <nav aria-label="Flight display" className="grid grid-cols-3 gap-1.5 border-t border-white/10 bg-[#0b0b0c] p-2 sm:grid-cols-6">
             {[
@@ -1019,10 +1034,65 @@ export function Pfd() {
           <span className="text-ink">R</span> NEW RUN · <span className="text-ink">MOUSE</span> YOKE · <span className="text-ink">W/S</span> POWER ·{" "}
           <span className="text-ink">F/V</span> FLAPS · <span className="text-ink">A</span> AUTOPILOT
         </p>
-        <p className="md:hidden">TAP FLY · DRAG TO STEER · BUTTONS FOR POWER &amp; FLAPS</p>
+        <p className="md:hidden">RIGHT THUMB FLIES · LEFT THUMB POWER &amp; FLAPS · NEW RUN FOR A SCORED RUN</p>
         <p className="max-w-[640px] text-[10px] leading-relaxed md:text-[11px]">
           TEN LANDINGS IN A ROW. THE RINGS SHRINK, THE WIND BUILDS AND THE LAND-BY LINE CREEPS TOWARD YOU. MISS A RING, LAND PAST THE LINE OR BREAK A LIMIT AND IT&apos;S BACK TO LEVEL 1.
         </p>
+      </div>
+    </div>
+  );
+}
+
+// Power and flaps. Rendered on the display for mouse users and in the phone
+// deck for touch, so the readouts use shared data-pfd names (see qa()).
+function PowerFlaps({ className, big }: { className: string; big?: boolean }) {
+  const key = big ? "pfd-key !h-10 !w-9 text-[15px]" : "pfd-key";
+  const scale = big ? "h-[84px]" : "h-12 md:h-16";
+  return (
+    <div className={className}>
+      <div className="flex flex-col items-center gap-1">
+        <span className="text-[9px] tracking-[.12em] text-dim md:text-[10px]">PWR</span>
+        <div className={`relative ${scale} w-2.5 overflow-hidden rounded-full bg-white/10`}>
+          <div data-pfd="pwr-fill" className="absolute inset-0 origin-bottom bg-green" style={{ transform: `scaleY(${INITIAL.throttle})` }} />
+        </div>
+        <span data-pfd="pwr-text" className="text-[10px] tabular-nums text-ink md:text-[11px]">
+          100%
+        </span>
+      </div>
+      <div className="flex flex-col justify-center gap-1">
+        <button type="button" data-hold="1" aria-label="More power (W)" className={key}>
+          +
+        </button>
+        <button type="button" data-hold="-1" aria-label="Less power (S)" className={key}>
+          −
+        </button>
+      </div>
+      <div className={`${big ? "" : "mx-0.5"} w-px bg-white/10`} />
+      <div className="flex flex-col items-center gap-1">
+        <span className="text-[9px] tracking-[.12em] text-dim md:text-[10px]">FLAPS</span>
+        <div className={`relative ${scale} ${big ? "w-5" : "w-7"}`}>
+          {[0, 10, 20, 30].map((f) => (
+            <span key={f} className="absolute left-0 -translate-y-1/2 text-[8px] text-dim md:text-[9px]" style={{ top: `${(f / 30) * 100}%` }}>
+              {f}
+            </span>
+          ))}
+          <div className="absolute inset-y-0 right-0 w-0">
+            <div data-pfd="flap-pointer" className="absolute inset-x-0 top-0 h-full will-change-transform">
+              <div className="-ml-2 -mt-[5px] h-0 w-0 border-y-[5px] border-r-[8px] border-y-transparent border-r-cyan" />
+            </div>
+          </div>
+        </div>
+        <span data-pfd="flap-text" className="text-[10px] tabular-nums text-ink md:text-[11px]">
+          0°
+        </span>
+      </div>
+      <div className="flex flex-col justify-center gap-1">
+        <button type="button" data-action="flaps-up" aria-label="Flaps up (V)" className={key}>
+          ▲
+        </button>
+        <button type="button" data-action="flaps-down" aria-label="Flaps down (F)" className={key}>
+          ▼
+        </button>
       </div>
     </div>
   );

@@ -12,8 +12,8 @@ export async function GameSection({ children }: { children: React.ReactNode }) {
   const board = contest ? await getLeaderboard(contest.id, 5) : { entries: [], total: 0 };
 
   return (
-    <section id="fly" className="scroll-mt-20 px-6 py-20 md:py-24">
-      <div className="mx-auto flex max-w-[1180px] flex-col gap-12">
+    <section id="fly" className="scroll-mt-20 px-6 py-14 md:py-20">
+      <div className="mx-auto flex max-w-[1180px] flex-col gap-9 md:gap-10">
         <SectionHeader
           eyebrow={contest ? (live ? "● Contest live · the flight game" : "The flight game") : "The flight game"}
           tone="text-magenta"
@@ -22,7 +22,7 @@ export async function GameSection({ children }: { children: React.ReactNode }) {
               Ten landings. <span className="text-dim">Miss one, back to one.</span>
             </>
           }
-          intro="The rings shrink, the wind builds and the land-by line creeps toward you. Hover the display to take the controls, or press R to start a ranked run."
+          intro="The rings shrink, the wind builds and the land-by line creeps toward you. On a computer, hover the display to fly and press R for a scored run. On a phone, fly with the thumb pad under it."
         />
 
         <div className="flex justify-center">{children}</div>
@@ -42,7 +42,7 @@ export async function GameSection({ children }: { children: React.ReactNode }) {
         <div className="grid gap-4 md:grid-cols-[1.4fr_1fr]">
           <div id="leaderboard" className="reveal flex scroll-mt-24 flex-col gap-3">
             {contest ? (
-              <LeaderboardTable entries={board.entries} empty="No scores yet. Fly a run and be the first on the board." />
+              <LeaderboardTable entries={board.entries} slots={5} empty="No scores yet. Fly a run and be the first on the board." />
             ) : (
               <div className="card accent-bar relative flex h-full flex-col justify-center gap-3 p-8" style={{ ["--bar" as string]: "var(--color-amber)" }}>
                 <span className="font-mono text-[12px] tracking-[.14em] text-amber">● LEADERBOARD OPENING SOON</span>

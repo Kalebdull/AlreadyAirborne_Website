@@ -14,22 +14,25 @@ const QUESTIONS: [string, string][] = [
 // Apple-style list: each question opens in place. No script needed.
 export function Faq() {
   return (
-    <section id="faq" className="scroll-mt-20 border-t border-line px-6 py-20 md:py-24">
-      <div className="mx-auto flex max-w-[1180px] flex-col gap-12">
-        <SectionHeader
-          eyebrow="Questions"
-          title={
-            <>
-              Before you <span className="text-dim">book.</span>
-            </>
-          }
-          intro={
-            <>
-              Something else? <a href="mailto:alreadyairborne@gmail.com" className="link">Email me</a>.
-            </>
-          }
-        />
-        <div className="reveal mx-auto flex w-full max-w-3xl flex-col border-t border-line">
+    <section id="faq" className="scroll-mt-20 border-t border-line px-6 py-14 md:py-20">
+      <div className="mx-auto grid max-w-[1180px] gap-9 md:grid-cols-[1fr_1.5fr] md:gap-16">
+        <div className="md:sticky md:top-28 md:self-start">
+          <SectionHeader
+            align="left"
+            eyebrow="Questions"
+            title={
+              <>
+                Before you <span className="text-dim">book.</span>
+              </>
+            }
+            intro={
+              <>
+                Something else? <a href="mailto:alreadyairborne@gmail.com" className="link">Email me</a>.
+              </>
+            }
+          />
+        </div>
+        <div className="reveal flex w-full flex-col border-t border-line md:border-t-0">
           {QUESTIONS.map(([q, a]) => (
             <details key={q} className="group border-b border-line">
               <summary className="press flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-left font-display text-lg font-semibold hover:text-cyan md:text-xl [&::-webkit-details-marker]:hidden">
