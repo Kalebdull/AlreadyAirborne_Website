@@ -29,6 +29,9 @@ export async function payBooking(formData: FormData) {
   const base = await origin();
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
+    // Live 1-on-1 tutoring is a service, not a digital product, so Stripe's
+    // Managed Payments (on by default for new accounts) doesn't apply.
+    managed_payments: { enabled: false },
     line_items: [
       {
         quantity: 1,
