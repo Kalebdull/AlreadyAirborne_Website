@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { decode, replay } from "@/components/pfd/replay";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { site } from "@/lib/site";
 
 const CALLSIGN = /^[A-Za-z0-9 ._-]{2,16}$/;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -47,6 +48,12 @@ export async function POST(request: NextRequest) {
   // --- Save it ------------------------------------------------------------------
   const admin = createAdminClient();
   if (!admin) return error("The leaderboard isn't connected yet.", 503);
+
+  // The sponsor can't enter their own contest (rules, section 3).
+  const { data: staff } = await admin.from("profiles").select("id").eq("role", "admin").ilike("email", email.replace(/[\\%_]/g, "\\$&")).limit(1);
+  if (email === site.email.toLowerCase() || (staff?.length ?? 0) > 0) {
+    return error("Instructor accounts can't enter the contest. Nice flying though.");
+  }
 
   const now = new Date().toISOString();
   const { data: contest } = await admin
