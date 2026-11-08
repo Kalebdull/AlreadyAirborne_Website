@@ -405,10 +405,13 @@ html {
 
 /* Apple-style scroll zoom: the display settles into place as it arrives. */
 @supports (animation-timeline: view()) {
-  .scroll-settle {
-    animation: settle linear both;
-    animation-timeline: view();
-    animation-range: entry 0% cover 35%;
+  /* Big screens only: on a phone it just leaves the game small and floating. */
+  @media (min-width: 768px) {
+    .scroll-settle {
+      animation: settle linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 35%;
+    }
   }
   @keyframes settle {
     from {

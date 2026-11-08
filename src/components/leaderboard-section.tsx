@@ -25,7 +25,7 @@ export async function GameSection({ children }: { children: React.ReactNode }) {
           intro="The rings shrink, the wind builds and the land-by line creeps toward you. On a computer, hover the display to fly and press R for a scored run. On a phone, fly with the thumb pad under it."
         />
 
-        <div className="flex justify-center">{children}</div>
+        <div className="-mx-4 flex justify-center md:mx-0">{children}</div>
 
         {contest && live && (
           <div className="reveal flex flex-col items-center gap-1 text-center">

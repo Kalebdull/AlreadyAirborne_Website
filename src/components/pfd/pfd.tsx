@@ -1029,13 +1029,13 @@ export function Pfd() {
         </div>
       </div>
 
-      <div className="mt-5 flex flex-col items-center gap-2 text-center font-mono text-[11px] tracking-[.1em] text-dim md:text-[12px]">
+      <div className="mt-3 flex flex-col items-center gap-2 px-4 text-center font-mono text-[11px] tracking-[.1em] text-dim md:mt-5 md:px-0 md:text-[12px]">
         <p className="hidden md:block">
           <span className="text-ink">R</span> NEW RUN · <span className="text-ink">MOUSE</span> YOKE · <span className="text-ink">W/S</span> POWER ·{" "}
           <span className="text-ink">F/V</span> FLAPS · <span className="text-ink">A</span> AUTOPILOT
         </p>
         <p className="md:hidden">RIGHT THUMB FLIES · LEFT THUMB POWER &amp; FLAPS · NEW RUN FOR A SCORED RUN</p>
-        <p className="max-w-[640px] text-[10px] leading-relaxed md:text-[11px]">
+        <p className="hidden max-w-[640px] text-[11px] leading-relaxed md:block">
           TEN LANDINGS IN A ROW. THE RINGS SHRINK, THE WIND BUILDS AND THE LAND-BY LINE CREEPS TOWARD YOU. MISS A RING, LAND PAST THE LINE OR BREAK A LIMIT AND IT&apos;S BACK TO LEVEL 1.
         </p>
       </div>
