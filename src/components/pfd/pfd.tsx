@@ -115,6 +115,9 @@ export function Pfd() {
     const fallback = el.querySelectorAll<HTMLElement>('[data-pfd="fallback"]');
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Phones have no R key; they start a scored run with the New Run button.
+    const touch = window.matchMedia("(pointer: coarse)").matches;
+    const START = touch ? "TAP NEW RUN" : "PRESS R";
     const flight: FlightState = createRun(reduced);
     let bestRun: { result: RunResult; replay: string } | null = null;
     try {
@@ -150,7 +153,17 @@ export function Pfd() {
       input.stickX = inverseStickCurve(Math.max(-1, Math.min(1, flight.roll / 40)));
       input.stickY = inverseStickCurve(Math.max(-1, Math.min(1, (flight.trimPitch - flight.pitch) / 16)));
       if (flight.apUsed && (flight.phase === "ap" || flight.phase === "manual")) {
-        flight.toast = { text: "PRACTICE · PRESS R TO START A SCORED RUN", tone: "cyan", at: flight.time };
+        flight.toast = { text: `PRACTICE · ${START} TO START A SCORED RUN`, tone: "cyan", at: flight.time };
+      }
+    }
+
+    // Same as R: a fresh scored run from the runway.
+    function newRun() {
+      engage(performance.now());
+      input.retry = true;
+      if (flight.phase === "manual" || flight.phase === "ap") {
+        restart(flight);
+        startRecording();
       }
     }
 
@@ -163,7 +176,8 @@ export function Pfd() {
     function controls(now: number, dt: number): Controls {
       if (input.hoverSince >= 0 && now - input.hoverSince > ENGAGE_DELAY) engage(now);
       // Walk away for a while and the autopilot takes back over.
-      if (input.engaged && input.hoverSince < 0 && !input.padActive && now - input.lastInput > IDLE_RELEASE) {
+      // (Not on phones: there the autopilot only comes back when you tap AUTOPILOT.)
+      if (!touch && input.engaged && input.hoverSince < 0 && !input.padActive && now - input.lastInput > IDLE_RELEASE) {
         release("AUTOPILOT ENGAGED · YOU LET GO");
       }
 
@@ -291,7 +305,7 @@ export function Pfd() {
       parts.cardHint.textContent = r.newBest
         ? "NEW PERSONAL BEST"
         : !r.ranked && r.score > 0
-          ? "AUTOPILOT FLEW PART OF THIS RUN · PRESS R FOR A RANKED ONE"
+          ? `AUTOPILOT FLEW PART OF THIS RUN · ${START} FOR A RANKED ONE`
           : "";
       parts.cardHint.dataset.tone = r.newBest ? "magenta" : "amber";
     }
@@ -409,7 +423,7 @@ export function Pfd() {
         for (const p of parts.pwrText) p.textContent = `${Math.round(s.throttle * 100)}%`;
         for (const p of parts.flapText) p.textContent = `${s.flapsCmd}°`;
         parts.best.textContent = s.best === null ? "—" : s.best.toLocaleString();
-        parts.bestRank.textContent = s.best === null ? "PRESS R TO START A RUN" : bestRun ? "SUBMIT RECORD ›" : "BEST RUN";
+        parts.bestRank.textContent = s.best === null ? `${START} TO START A RUN` : bestRun ? "SUBMIT RECORD ›" : "BEST RUN";
         parts.bestPanel.disabled = !bestRun;
         const flying = s.phase === "manual" || (s.phase === "ap" && s.airborne);
         parts.runType.textContent = s.phase === "manual" ? (s.apUsed ? "PRACTICE" : "RANKED RUN") : "";
@@ -552,7 +566,10 @@ export function Pfd() {
         input.padActive = true;
         input.padX = input.padY = 0;
         parts.yoke.dataset.active = "true";
-        engage(performance.now());
+        // Taking the controls of the demo (or a practice run) starts a fresh
+        // scored run from level 1, so phone players never fly one that can't count.
+        if (flight.apUsed && !scripted) newRun();
+        else engage(performance.now());
         return;
       }
       if (e.pointerId !== padPointer) return;
@@ -652,15 +669,7 @@ export function Pfd() {
         lastCard = "";
       }
       if (action === "autopilot") release("AUTOPILOT ENGAGED");
-      if (action === "new-run") {
-        // Same as R: a fresh scored run from the runway.
-        engage(performance.now());
-        input.retry = true;
-        if (flight.phase === "manual" || flight.phase === "ap") {
-          restart(flight);
-          startRecording();
-        }
-      }
+      if (action === "new-run") newRun();
     };
 
     const padTypes = ["pointerdown", "pointermove", "pointerup", "pointercancel", "lostpointercapture"];
