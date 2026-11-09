@@ -340,11 +340,17 @@ html {
 .reveal-stagger > * {
   opacity: 0;
   transform: translateY(32px) scale(0.985);
-  filter: blur(8px);
   transition:
     opacity 0.9s var(--ease-out),
     transform 1.1s var(--ease-out),
     filter 0.9s var(--ease-out);
+}
+/* The blur is a desktop flourish; on phones it costs smooth scrolling. */
+@media (min-width: 768px) and (pointer: fine) {
+  .reveal:not(.is-visible),
+  .reveal-stagger:not(.is-visible) > * {
+    filter: blur(8px);
+  }
 }
 .reveal.is-visible,
 .reveal-stagger.is-visible > * {

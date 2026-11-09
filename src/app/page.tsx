@@ -48,9 +48,13 @@ function ImageTreatment({ glow = true }: { glow?: boolean }) {
 
 function Hero() {
   return (
-    <section className="relative flex min-h-[780px] items-end overflow-hidden md:h-[92vh] md:min-h-[640px]">
-      <HeroUntangle className="absolute inset-x-0 top-6 h-[42%] w-full object-[94%_50%] [mask-image:linear-gradient(to_bottom,black_62%,transparent_96%)] md:[mask-image:none] md:inset-0 md:h-full md:object-[80%_50%]" />
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,#000_0%,rgba(0,0,0,.85)_38%,transparent_62%)] md:bg-[linear-gradient(100deg,rgba(0,0,0,.95)_0%,rgba(0,0,0,.75)_40%,transparent_66%)]" />
+    <section className="relative flex flex-col overflow-hidden pt-14 md:h-[92vh] md:min-h-[640px] md:flex-row md:items-end md:pt-0">
+      {/* Phones: the loop gets its own band above the headline. Desktop: full bleed behind it. */}
+      <div className="relative mx-auto aspect-[832/720] w-[88%] max-w-[380px] md:absolute md:w-full md:inset-0 md:aspect-auto md:max-w-none">
+        <HeroUntangle className="absolute inset-0 h-full w-full md:object-[80%_50%]" />
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(closest-side,transparent_70%,#000_100%)] md:hidden" />
+      </div>
+      <div aria-hidden className="pointer-events-none absolute inset-0 hidden bg-[linear-gradient(100deg,rgba(0,0,0,.95)_0%,rgba(0,0,0,.75)_40%,transparent_66%)] md:block" />
       <div aria-hidden className="grain" />
 
       <div className="absolute left-[clamp(1.25rem,4vw,4rem)] top-6 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[3px] text-soft">
@@ -61,10 +65,11 @@ function Hero() {
         Now on Instagram · @{site.instagram.handle}
       </div>
 
-      <div className="pointer-events-none relative w-full pb-20 pl-[clamp(1.25rem,4vw,4rem)] pr-6 pt-32 md:pb-24">
-        <div className="pointer-events-auto flex max-w-3xl flex-col items-start gap-6">
+      <div className="pointer-events-none relative -mt-2 w-full pb-14 pl-[clamp(1.25rem,4vw,4rem)] pr-6 md:mt-0 md:pb-24 md:pt-32">
+        <div className="pointer-events-auto flex max-w-3xl flex-col items-start gap-5 md:gap-6">
           <span className="fade-up rounded-full bg-cyan/15 px-3.5 py-1.5 font-mono text-[11px] tracking-[.14em] text-cyan ring-1 ring-cyan/30">
-            FLIGHT INSTRUCTION · {site.instructor.location.toUpperCase()} &amp; ZOOM
+            <span className="md:hidden">CFI · {site.instructor.location.split(",")[0].toUpperCase()} &amp; ZOOM</span>
+            <span className="hidden md:inline">FLIGHT INSTRUCTION · {site.instructor.location.toUpperCase()} &amp; ZOOM</span>
           </span>
           <div className="flex items-start gap-5">
             <span className="fade-up mt-2 hidden h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-black/60 shadow-[0_12px_40px_rgba(0,0,0,.65)] ring-1 ring-white/10 backdrop-blur md:flex">
@@ -87,7 +92,8 @@ function Hero() {
               Book a session
             </Link>
             <a href="#fly" className="btn btn-ghost !border-white/35">
-              Fly the landing game
+              <span className="md:hidden">Fly the game</span>
+              <span className="hidden md:inline">Fly the landing game</span>
             </a>
           </div>
         </div>

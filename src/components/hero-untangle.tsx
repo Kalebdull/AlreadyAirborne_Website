@@ -9,6 +9,9 @@ import { useEffect, useRef } from "react";
 // invisible until it is actually playing. When a phone refuses to autoplay
 // (iPhone Low Power Mode), visitors see the still, never a play button.
 //
+// Phones get their own cut (design/blender/phone_cut.py): cropped to the
+// marker and about a fifth of the size, so it starts fast and plays smoothly.
+//
 // The <video> is written as raw HTML on purpose: React sets `muted` as a
 // property, not an attribute, and iOS only autoplays videos whose server
 // markup says muted.
@@ -67,11 +70,14 @@ export function HeroUntangle({ className }: { className?: string }) {
   return (
     <div ref={wrap} className={className}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/hero-untangle.jpg" alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover object-[inherit]" />
+      <picture>
+        <source media="(max-width: 767px)" srcSet="/hero-untangle-phone.jpg" />
+        <img src="/hero-untangle.jpg" alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover object-[inherit]" />
+      </picture>
       <div
         className="absolute inset-0 object-[inherit]"
         dangerouslySetInnerHTML={{
-          __html: `<video class="hero-video h-full w-full object-cover object-[inherit]" style="opacity:0;transition:opacity .6s ease" src="/hero-untangle.mp4" autoplay muted loop playsinline webkit-playsinline preload="auto" disablepictureinpicture disableremoteplayback aria-label="${ARIA}"></video>`,
+          __html: `<video class="hero-video h-full w-full object-cover object-[inherit]" style="opacity:0;transition:opacity .6s ease" autoplay muted loop playsinline webkit-playsinline preload="auto" disablepictureinpicture disableremoteplayback aria-label="${ARIA}"><source src="/hero-untangle-phone.mp4" type="video/mp4" media="(max-width: 767px)"><source src="/hero-untangle.mp4" type="video/mp4"></video>`,
         }}
       />
     </div>
