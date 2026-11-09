@@ -69,7 +69,6 @@ export function HeroUntangle({ className }: { className?: string }) {
 
   return (
     <div ref={wrap} className={className}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <picture>
         <source media="(max-width: 767px)" srcSet="/hero-untangle-phone.jpg" />
         <img src="/hero-untangle.jpg" alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover object-[inherit]" />
