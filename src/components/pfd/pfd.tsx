@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { LogoMark } from "@/components/logo";
 import { createRun, inverseStickCurve, modeLabel, readouts, restart, step, type Controls, type FlightState, type RunResult } from "./flight-model";
 import { decode, encode, quantize, toControls, type Frame } from "./replay";
-import type { SvtScene } from "./scene";
+import type { RingCue, SvtScene } from "./scene";
 import { ScoreSubmit, type SubmitApi } from "./score-submit";
 import { LEVEL_COUNT, LEVELS } from "./levels";
 import { track } from "@/lib/track";
@@ -81,6 +81,8 @@ export function Pfd() {
       annOverspeed: q<HTMLDivElement>("ann-overspeed"),
       annTerrain: q<HTMLDivElement>("ann-terrain"),
       toast: q<HTMLDivElement>("toast"),
+      ringCue: q<HTMLDivElement>("ring-cue"),
+      ringCueArrow: q<HTMLDivElement>("ring-cue-arrow"),
       fade: q<HTMLDivElement>("fade"),
       pwrFill: qa<HTMLDivElement>("pwr-fill"),
       pwrText: qa<HTMLSpanElement>("pwr-text"),
@@ -318,6 +320,37 @@ export function Pfd() {
       );
     }
 
+    // The next ring: a magenta diamond on its center, or an arrow at the edge
+    // of the display pointing to it when it's out of view.
+    function renderRingCue(s: FlightState, cue: RingCue) {
+      const show = cue && (s.phase === "ap" || s.phase === "manual");
+      parts.ringCue.hidden = !show;
+      if (!cue || !show) return;
+      const w = parts.svt.clientWidth;
+      const h = parts.svt.clientHeight;
+      let px = ((cue.x + 1) / 2) * w;
+      let py = ((1 - cue.y) / 2) * h;
+      // Keep clear of the speed and altitude tapes and the top/bottom readouts.
+      const minX = w * 0.2, maxX = w * 0.8, minY = h * 0.12, maxY = h * 0.82;
+      const inView = cue.front && px >= minX && px <= maxX && py >= minY && py <= maxY;
+      if (!inView) {
+        // Push it to the edge of that box along the line from the center.
+        let dx = px - w / 2;
+        let dy = py - h / 2;
+        if (!cue.front) {
+          dx = -dx;
+          dy = -dy;
+        }
+        if (Math.abs(dx) < 1e-3 && Math.abs(dy) < 1e-3) dy = 1;
+        const k = Math.min((maxX - w / 2) / Math.max(Math.abs(dx), 1e-3), (maxY - h / 2) / Math.max(Math.abs(dy), 1e-3));
+        px = w / 2 + dx * k;
+        py = h / 2 + dy * k;
+        parts.ringCueArrow.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
+      }
+      parts.ringCue.dataset.mode = inView ? "on" : "off";
+      parts.ringCue.style.transform = `translate(${px}px, ${py}px)`;
+    }
+
     function render(s: FlightState) {
       const r = readouts(s);
       parts.attitude.style.transform = `rotate(${-r.roll}deg) translateY(calc(var(--ppd) * ${r.pitch}))`;
@@ -340,7 +373,7 @@ export function Pfd() {
       for (const p of parts.pwrFill) p.style.transform = `scaleY(${s.throttle})`;
       for (const p of parts.flapPointer) p.style.transform = `translateY(${(s.flaps / 30) * 100}%)`;
 
-      svt?.update(s, r);
+      renderRingCue(s, svt?.update(s, r) ?? null);
       renderCard(s);
       renderIntro(s);
       parts.windArrow.style.transform = `rotate(${r.windArrow}deg)`;
@@ -775,6 +808,18 @@ export function Pfd() {
                 <path d="M0 10 H78 L120 32 L162 10 H240" fill="none" stroke="#000" strokeWidth="9" strokeLinejoin="round" />
                 <path d="M0 10 H78 L120 32 L162 10 H240" fill="none" stroke="#facc15" strokeWidth="5" strokeLinejoin="round" />
               </svg>
+
+              {/* Next ring cue: diamond on the ring, or an edge arrow when it's out of view */}
+              <div data-pfd="ring-cue" hidden data-mode="on" className="group pointer-events-none absolute left-0 top-0 will-change-transform">
+                <svg viewBox="0 0 20 20" className="absolute -left-[9px] -top-[9px] h-[18px] w-[18px] drop-shadow-[0_0_6px_rgba(240,72,200,.9)] group-data-[mode=off]:hidden" aria-hidden>
+                  <path d="M10 2 L18 10 L10 18 L2 10 Z" fill="#f048c8" stroke="#000" strokeWidth="1.5" strokeLinejoin="round" />
+                </svg>
+                <div data-pfd="ring-cue-arrow" className="absolute left-0 top-0 hidden h-0 w-0 group-data-[mode=off]:block">
+                  <svg viewBox="0 0 20 20" className="absolute -left-[10px] -top-[10px] h-5 w-5 drop-shadow-[0_0_6px_rgba(240,72,200,.9)]" aria-hidden>
+                    <path d="M4 3 L17 10 L4 17 L7 10 Z" fill="#f048c8" stroke="#000" strokeWidth="1" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              </div>
 
               {/* Flight path marker: the logo, showing where you're actually going */}
               <div data-pfd="fpm" className="pointer-events-none absolute left-1/2 top-1/2 will-change-transform" style={{ transform: "translate(-50%, -50%)" }}>

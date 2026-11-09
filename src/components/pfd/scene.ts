@@ -17,8 +17,12 @@ const MAGENTA = new THREE.Color("#f048c8");
 const GREEN = new THREE.Color("#4ade80");
 const AMBER = new THREE.Color("#fbbf24");
 
+// Where the next ring's center lands on the display: x/y in normalized
+// device coordinates (-1..1, +y up), and whether it's in front of the camera.
+export type RingCue = { x: number; y: number; front: boolean } | null;
+
 export type SvtScene = {
-  update: (s: FlightState, view: { pitch: number; roll: number; camera: { x: number; y: number; z: number } }) => void;
+  update: (s: FlightState, view: { pitch: number; roll: number; camera: { x: number; y: number; z: number } }) => RingCue;
   resize: (w: number, h: number) => void;
   dispose: () => void;
 };
@@ -344,7 +348,17 @@ export function createScene(container: HTMLElement): SvtScene {
     });
 
     renderer.render(scene, camera);
+
+    const next = LEVELS[s.levelIndex].course.rings[s.nextRing];
+    if (!next || s.rings[s.nextRing]?.status !== "pending") return null;
+    cue.set(next.x, next.y, next.z);
+    camera.getWorldDirection(forward);
+    const front = cue.clone().sub(camera.position).dot(forward) > 0;
+    cue.project(camera);
+    return { x: cue.x, y: cue.y, front };
   }
+  const cue = new THREE.Vector3();
+  const forward = new THREE.Vector3();
 
   function resize(w: number, h: number) {
     renderer.setSize(w, h, false);
