@@ -44,7 +44,7 @@ export function SettingsForm({
 
   return (
     <form action={action} className="flex flex-col gap-10">
-      <section className="card grid gap-6 p-8 md:grid-cols-2">
+      <section className="card grid gap-6 p-5 md:grid-cols-2 md:p-8">
         <h2 className="eyebrow md:col-span-2">Session details</h2>
         <label className="label md:col-span-2">
           Your Zoom meeting link
@@ -82,7 +82,7 @@ export function SettingsForm({
         </div>
       </section>
 
-      <section className="card flex flex-col gap-5 p-8">
+      <section className="card flex flex-col gap-5 p-5 md:p-8">
         <div className="flex flex-col gap-1">
           <h2 className="eyebrow">Weekly hours</h2>
           <p className="text-[15px] text-mute">
@@ -108,7 +108,7 @@ export function SettingsForm({
                   <td className="pr-2 text-right text-dim">{label(t)}</td>
                   {DAYS.map((d, i) => (
                     <td key={d}>
-                      <label className="block cursor-pointer">
+                      <label className="relative block cursor-pointer">
                         <input
                           type="checkbox"
                           name="slot"

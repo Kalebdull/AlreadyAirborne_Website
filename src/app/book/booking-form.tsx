@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useMemo, useState, useSyncExternalStore } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { Slot } from "@/lib/slots";
 import {
   SERVICES,
@@ -53,6 +53,11 @@ export function BookingForm({
   const [zoomHours, setZoomHours] = useState<number>(1);
   const [dayKey, setDayKey] = useState<string | null>(null);
   const [startsAt, setStartsAt] = useState<string | null>(null);
+  // On a phone the times are below the fold once a day is picked; bring them up.
+  const timesRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (dayKey) timesRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [dayKey]);
   const [state, formAction, pending] = useActionState(requestBooking, undefined);
 
   const days = useMemo(() => (isClient ? groupByLocalDay(slots) : []), [isClient, slots]);
@@ -109,14 +114,14 @@ export function BookingForm({
               <button
                 key={s.id}
                 type="button"
-                className="option p-[22px]"
+                className="option p-4 md:p-[22px]"
                 aria-pressed={serviceId === s.id}
                 onClick={() => setServiceId(s.id)}
               >
                 <span className={`block font-mono text-[11px] uppercase tracking-[.1em] ${s.accent === "cyan" ? "text-cyan" : "text-magenta"}`}>
                   {s.eyebrow}
                 </span>
-                <span className="mt-2.5 block font-display text-[22px] font-semibold">{s.label}</span>
+                <span className="mt-1.5 block font-display text-[20px] font-semibold md:mt-2.5 md:text-[22px]">{s.label}</span>
                 <span className="mt-1 block text-[15px] text-mute">
                   {s.priceLabel}
                   {isOral(s.id) ? " · 2 hours" : ""}
@@ -150,14 +155,14 @@ export function BookingForm({
           ) : days.length === 0 ? (
             <p className="rounded-2xl bg-card p-5 text-mute">No open times right now. Check back soon or message me on Instagram.</p>
           ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(78px,1fr))] gap-2">
+            <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-[repeat(auto-fill,minmax(78px,1fr))] sm:gap-2">
               {days.map((d) => {
                 const open = d.slots.some(fits);
                 return (
                   <button
                     key={d.key}
                     type="button"
-                    className="option px-2 py-3.5 text-center"
+                    className="option px-1 py-2.5 text-center sm:px-2 sm:py-3.5"
                     aria-pressed={dayKey === d.key}
                     disabled={!open}
                     onClick={() => {
@@ -168,7 +173,7 @@ export function BookingForm({
                     <span className="block font-mono text-[11px] uppercase text-dim">
                       {d.date.toLocaleDateString(undefined, { weekday: "short" })}
                     </span>
-                    <span className="mt-1 block font-display text-[26px] font-semibold">{d.date.getDate()}</span>
+                    <span className="block font-display text-[22px] font-semibold sm:mt-1 sm:text-[26px]">{d.date.getDate()}</span>
                     <span className="block font-mono text-[10px] uppercase text-dim">
                       {d.date.toLocaleDateString(undefined, { month: "short" })}
                     </span>
@@ -181,7 +186,7 @@ export function BookingForm({
 
         <Step label={`${serviceId === "zoom" ? 4 : 3} · Start time${tzName ? ` (${tzName})` : ""}`}>
           {day ? (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-2">
+            <div ref={timesRef} className="grid scroll-mb-6 grid-cols-3 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(110px,1fr))]">
               {day.slots.map((s) => (
                 <button
                   key={s.startsAt}

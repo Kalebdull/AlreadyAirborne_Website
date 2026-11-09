@@ -22,7 +22,13 @@ export async function GameSection({ children }: { children: React.ReactNode }) {
               Ten landings. <span className="text-dim">Miss one, back to one.</span>
             </>
           }
-          intro="The rings shrink, the wind builds and the land-by line creeps toward you. On a computer, hover the display to fly and press R for a scored run. On a phone, fly with the thumb pad under it."
+          intro={
+            <>
+              The rings shrink, the wind builds and the land-by line creeps toward you.{" "}
+              <span className="[@media(pointer:coarse)]:hidden">Hover the display to fly and press R for a scored run.</span>
+              <span className="hidden [@media(pointer:coarse)]:inline">Fly with the thumb pad under the display and tap New Run for a scored run.</span>
+            </>
+          }
         />
 
         <div className="-mx-4 flex justify-center md:mx-0">{children}</div>
@@ -55,7 +61,11 @@ export async function GameSection({ children }: { children: React.ReactNode }) {
             <span className="eyebrow">Fair play</span>
             <ul className="flex flex-col gap-3 text-[15px] leading-relaxed text-soft">
               <li className="flex gap-3">
-                <span className="font-mono text-green">01</span>Press R and hand-fly from level 1. Autopilot runs don&apos;t count.
+                <span className="font-mono text-green">01</span>
+                <span>
+                  <span className="[@media(pointer:coarse)]:hidden">Press R</span>
+                  <span className="hidden [@media(pointer:coarse)]:inline">Tap New Run</span> and hand-fly from level 1. Autopilot runs don&apos;t count.
+                </span>
               </li>
               <li className="flex gap-3">
                 <span className="font-mono text-green">02</span>Every score is verified by re-flying your run on our server.
@@ -66,7 +76,7 @@ export async function GameSection({ children }: { children: React.ReactNode }) {
             </ul>
             <div className="mt-auto">
               <Link href="/leaderboard" className="btn btn-ghost btn-sm">
-                {board.total > 0 ? `All ${board.total} pilots` : "Rules & scoring"}
+                {board.total > 0 ? board.total === 1 ? "See the leaderboard" : `All ${board.total} pilots` : "Rules & scoring"}
               </Link>
             </div>
           </div>

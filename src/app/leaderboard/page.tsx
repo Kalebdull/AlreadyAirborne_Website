@@ -21,28 +21,28 @@ export default async function LeaderboardPage() {
           <h1 className="headline text-[48px] md:text-[72px]">{contest?.title ?? "Top pilots."}</h1>
           {contest && (
             <p className="max-w-[620px] text-xl leading-snug text-mute">
-              Highest verified score when the clock runs out wins <span className="text-ink">{contest.prize}</span>.
+              Highest verified score when the clock runs out wins <span className="text-ink">{contest.prize.charAt(0).toLowerCase() + contest.prize.slice(1)}</span>.
             </p>
           )}
         </div>
 
         {contest && (
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="card flex flex-col gap-1 p-6">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            <div className="card flex min-w-0 flex-col gap-1 p-4 sm:p-6">
               <span className="eyebrow">{live ? "Ends in" : "Ended"}</span>
               {live ? (
-                <Countdown to={contest.ends_at} className="font-mono text-2xl font-bold tabular-nums text-cyan" />
+                <Countdown to={contest.ends_at} className="font-mono text-[15px] font-bold tabular-nums text-cyan sm:text-2xl" />
               ) : (
-                <span className="font-mono text-2xl font-bold">{new Date(contest.ends_at).toLocaleDateString()}</span>
+                <span className="font-mono text-[15px] font-bold sm:text-2xl">{new Date(contest.ends_at).toLocaleDateString()}</span>
               )}
             </div>
-            <div className="card flex flex-col gap-1 p-6">
+            <div className="card flex min-w-0 flex-col gap-1 p-4 sm:p-6">
               <span className="eyebrow">Pilots</span>
-              <span className="font-mono text-2xl font-bold tabular-nums">{board.total}</span>
+              <span className="font-mono text-[15px] font-bold tabular-nums sm:text-2xl">{board.total}</span>
             </div>
-            <div className="card flex flex-col gap-1 p-6">
+            <div className="card flex min-w-0 flex-col gap-1 p-4 sm:p-6">
               <span className="eyebrow">Leading</span>
-              <span className="font-mono text-2xl font-bold tabular-nums text-magenta">{board.entries[0]?.score.toLocaleString() ?? "—"}</span>
+              <span className="font-mono text-[15px] font-bold tabular-nums text-magenta sm:text-2xl">{board.entries[0]?.score.toLocaleString() ?? "—"}</span>
             </div>
           </div>
         )}

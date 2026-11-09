@@ -12,8 +12,8 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-line bg-[#050608] px-6 py-16">
       <div className="mx-auto flex max-w-[1180px] flex-col gap-12">
-        <div className="grid gap-10 md:grid-cols-[1.5fr_repeat(3,1fr)]">
-          <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-3 gap-x-4 gap-y-10 md:grid-cols-[1.5fr_repeat(3,1fr)] md:gap-10">
+          <div className="col-span-3 flex flex-col gap-4 md:col-span-1">
             <span className="font-display text-xl font-semibold">{site.name}</span>
             <span className="font-mono text-[10px] tracking-[.2em] text-cyan">HARD TOPICS · THIRTY SECONDS</span>
             <p className="max-w-[320px] text-[14px] leading-relaxed text-mute">
@@ -37,7 +37,7 @@ export function SiteFooter() {
             </div>
           </div>
           {COLUMNS.map((col) => (
-            <nav key={col.title} aria-label={col.title} className="flex flex-col gap-3 text-[14px]">
+            <nav key={col.title} aria-label={col.title} className="flex flex-col gap-3 text-[13px] md:text-[14px]">
               <span className="font-mono text-[11px] uppercase tracking-[.16em] text-cyan">{col.title}</span>
               {col.links.map(([label, href]) => (
                 <Link key={href} href={href} className="footer-link press">

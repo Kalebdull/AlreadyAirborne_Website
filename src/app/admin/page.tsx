@@ -99,8 +99,10 @@ export default async function AdminOverviewPage({ searchParams }: PageProps<"/ad
             {s.live > 0 && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green opacity-60 motion-reduce:animate-none" />}
             <span className={`relative inline-flex h-2 w-2 rounded-full ${s.live > 0 ? "bg-green" : "bg-dim"}`} />
           </span>
-          {s.live > 0 ? `${s.live} ON THE SITE NOW` : "NOBODY ON THE SITE RIGHT NOW"}
-          <span className="text-dim">· YOUR OWN VISITS AREN&apos;T COUNTED</span>
+          <span>
+            {s.live > 0 ? `${s.live} ON THE SITE NOW` : "NOBODY ON THE SITE RIGHT NOW"}
+            <span className="block text-dim md:inline"><span className="hidden md:inline"> · </span>YOUR OWN VISITS AREN&apos;T COUNTED</span>
+          </span>
         </p>
         <div className="flex gap-1 rounded-full bg-card p-1" role="group" aria-label="Date range">
           {RANGES.map((r) => (
@@ -155,7 +157,7 @@ export default async function AdminOverviewPage({ searchParams }: PageProps<"/ad
 
         <div className="flex flex-col gap-6">
           <section className="card accent-bar relative flex flex-col gap-4 p-6" style={{ ["--bar" as string]: issues ? "var(--color-amber)" : "var(--color-green)" }}>
-            <div className="flex items-baseline justify-between gap-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
               <h2 className="eyebrow">Preflight checklist</h2>
               <span className={`font-mono text-[11px] font-bold tracking-[.1em] ${issues ? "text-amber" : "text-green"}`}>
                 {issues ? `${issues} TO CHECK` : "ALL GREEN"}
@@ -192,7 +194,7 @@ export default async function AdminOverviewPage({ searchParams }: PageProps<"/ad
       {/* --- Game ----------------------------------------------------------------------------- */}
       <section className="flex flex-col gap-4">
         <h2 className="eyebrow text-magenta">The flight game · last {days} days</h2>
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
           <div className="card flex flex-col gap-5 p-6">
             <div className="flex items-baseline justify-between">
               <h3 className="font-display text-xl font-semibold">How far runs get</h3>
@@ -201,7 +203,7 @@ export default async function AdminOverviewPage({ searchParams }: PageProps<"/ad
             <LevelBars levels={s.levels} />
           </div>
           <div className="card flex flex-col gap-4 p-6">
-            <div className="flex items-baseline justify-between gap-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
               <h3 className="font-display text-xl font-semibold">Top pilots</h3>
               <span className="font-mono text-[11px] text-dim">INCLUDING UNSUBMITTED RUNS</span>
             </div>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 
 type NavLink = { href: string; label: string };
 
@@ -36,8 +37,31 @@ export function DesktopNav({ links }: { links: NavLink[] }) {
 // Mobile menu rows, with a dot on the active page.
 export function MobileNavLinks({ links }: { links: NavLink[] }) {
   const pathname = usePathname();
+  const anchor = useRef<HTMLSpanElement>(null);
+
+  // The menu is a <details>, which stays open on its own. Close it after a
+  // link is followed (including a same-page #section link) or on a tap outside.
+  useEffect(() => {
+    const menu = anchor.current?.closest("details");
+    if (!menu) return;
+    menu.open = false;
+    const onDown = (e: PointerEvent) => {
+      if (menu.open && !menu.contains(e.target as Node)) menu.open = false;
+    };
+    const onClick = (e: MouseEvent) => {
+      if ((e.target as Element).closest("a")) menu.open = false;
+    };
+    document.addEventListener("pointerdown", onDown);
+    menu.addEventListener("click", onClick);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      menu.removeEventListener("click", onClick);
+    };
+  }, [pathname]);
+
   return (
     <>
+      <span ref={anchor} hidden />
       {links.map((l) => {
         const active = isActive(pathname, l.href);
         return (

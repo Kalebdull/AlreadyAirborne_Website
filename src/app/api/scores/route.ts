@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   }
   const result = flight.result;
   if ((flight.phase !== "failed" && flight.phase !== "complete") || !result) return error("That run didn't finish.");
-  if (!result.ranked) return error("Only runs you hand-fly from level 1 count. Press R and fly it yourself.");
+  if (!result.ranked) return error("Only runs you hand-fly from level 1 count. Press R (or tap New Run on a phone) and fly it yourself.");
   if (result.score <= 0) return error("Land at least one level to get on the board.");
   // Browsers do floating-point math identically in practice; allow a sliver
   // of slack for engines that round transcendental functions differently.
