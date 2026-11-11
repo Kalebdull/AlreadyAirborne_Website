@@ -27,7 +27,7 @@ export async function SiteHeader() {
       <div className="relative mx-auto flex h-[60px] max-w-[1180px] items-center gap-6 px-6">
         <Link href="/" className="press flex items-center gap-3 text-ink">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-black ring-1 ring-white/10">
-            <LogoMark size={22} />
+            <LogoMark size={30} glow />
           </span>
           <span className="flex flex-col leading-none">
             <span className="font-display text-[16px] font-semibold tracking-[-.01em]">AlreadyAirborne</span>

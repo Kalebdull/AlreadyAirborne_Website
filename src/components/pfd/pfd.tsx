@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef } from "react";
-import { LogoMark } from "@/components/logo";
+import { FlightPathMarker, LogoMark } from "@/components/logo";
 import { createRun, inverseStickCurve, modeLabel, readouts, restart, step, type Controls, type FlightState, type RunResult } from "./flight-model";
 import { decode, encode, quantize, toControls, type Frame } from "./replay";
 import type { RingCue, SvtScene } from "./scene";
@@ -727,7 +727,7 @@ export function Pfd() {
           {/* Top strip */}
           <div className="flex h-9 items-center gap-3 whitespace-nowrap border-b border-white/10 bg-[#0b0b0c] px-3 font-mono text-[10px] tracking-[.06em] text-dim sm:gap-4 sm:px-4 sm:text-[11px] md:h-10 md:gap-6 md:px-5 md:text-[12px]">
             <span className="flex items-center gap-2 text-ink">
-              <LogoMark size={20} />
+              <LogoMark size={22} />
               <span className="hidden sm:inline">AA-PFD</span>
             </span>
             <span className="hidden md:inline">
@@ -830,9 +830,9 @@ export function Pfd() {
                 </div>
               </div>
 
-              {/* Flight path marker: the logo, showing where you're actually going */}
+              {/* Flight path marker: where the airplane is actually going */}
               <div data-pfd="fpm" className="pointer-events-none absolute left-1/2 top-1/2 will-change-transform" style={{ transform: "translate(-50%, -50%)" }}>
-                <LogoMark size={44} className="text-green drop-shadow-[0_0_6px_rgba(0,0,0,.8)]" />
+                <FlightPathMarker size={44} className="text-green drop-shadow-[0_0_6px_rgba(0,0,0,.8)]" />
               </div>
 
               {/* Speed tape */}

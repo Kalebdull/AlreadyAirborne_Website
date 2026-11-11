@@ -48,13 +48,12 @@ function ImageTreatment({ glow = true }: { glow?: boolean }) {
 
 function Hero() {
   return (
-    <section className="relative flex flex-col overflow-hidden pt-14 md:h-[92vh] md:min-h-[640px] md:flex-row md:items-end md:pt-0">
-      {/* Phones: the loop gets its own band above the headline. Desktop: full bleed behind it. */}
-      <div className="relative mx-auto aspect-[832/720] w-[88%] max-w-[380px] md:absolute md:w-full md:inset-0 md:aspect-auto md:max-w-none">
-        <HeroUntangle className="absolute inset-0 h-full w-full md:object-[80%_50%]" />
-        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(closest-side,transparent_70%,#000_100%)] md:hidden" />
+    <section className="relative flex flex-col items-center overflow-hidden pb-14 pt-14 md:pb-20 md:pt-16">
+      {/* The A forms center stage; the headline sits centered beneath it. */}
+      <div className="relative aspect-[832/720] w-[88%] max-w-[380px] md:aspect-[16/7] md:w-full md:max-w-[1000px]">
+        <HeroUntangle className="absolute inset-0 h-full w-full" />
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(closest-side,transparent_70%,var(--color-page)_100%)] md:bg-[radial-gradient(ellipse_closest-side,transparent_62%,var(--color-page)_100%)]" />
       </div>
-      <div aria-hidden className="pointer-events-none absolute inset-0 hidden bg-[linear-gradient(100deg,rgba(0,0,0,.95)_0%,rgba(0,0,0,.75)_40%,transparent_66%)] md:block" />
       <div aria-hidden className="grain" />
 
       <div className="absolute left-[clamp(1.25rem,4vw,4rem)] top-6 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[3px] text-soft">
@@ -65,50 +64,32 @@ function Hero() {
         Now on Instagram · @{site.instagram.handle}
       </div>
 
-      <div className="pointer-events-none relative -mt-2 w-full pb-14 pl-[clamp(1.25rem,4vw,4rem)] pr-6 md:mt-0 md:pb-24 md:pt-32">
-        <div className="pointer-events-auto flex max-w-3xl flex-col items-start gap-5 md:gap-6">
-          <span className="fade-up rounded-full bg-cyan/15 px-3.5 py-1.5 font-mono text-[11px] tracking-[.14em] text-cyan ring-1 ring-cyan/30">
-            <span className="md:hidden">CFI · {site.instructor.location.split(",")[0].toUpperCase()} &amp; ZOOM</span>
-            <span className="hidden md:inline">FLIGHT INSTRUCTION · {site.instructor.location.toUpperCase()} &amp; ZOOM</span>
+      <div className="relative -mt-2 flex w-full max-w-5xl flex-col items-center gap-5 px-6 text-center md:-mt-6 md:gap-6">
+        <span className="fade-up rounded-full bg-cyan/15 px-3.5 py-1.5 font-mono text-[11px] tracking-[.14em] text-cyan ring-1 ring-cyan/30">
+          <span className="md:hidden">CFI · {site.instructor.location.split(",")[0].toUpperCase()} &amp; ZOOM</span>
+          <span className="hidden md:inline">FLIGHT INSTRUCTION · {site.instructor.location.toUpperCase()} &amp; ZOOM</span>
+        </span>
+        <h1 className="headline text-[clamp(3.25rem,8vw,5.5rem)] leading-[1.02]">
+          <span className="block lg:inline">
+            <RiseText text="Aviation," delay={130} />
+          </span>{" "}
+          <span className="block text-dim lg:inline">
+            <RiseText text="made simple." delay={230} />
           </span>
-          <div className="flex items-start gap-5">
-            <span className="fade-up mt-2 hidden h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-black/60 shadow-[0_12px_40px_rgba(0,0,0,.65)] ring-1 ring-white/10 backdrop-blur md:flex">
-              <LogoMark size={34} />
-            </span>
-            <h1 className="headline text-[clamp(3.25rem,8vw,5.5rem)] leading-[1.02]">
-              <span className="block">
-                <RiseText text="Aviation," delay={130} />
-              </span>
-              <span className="block text-dim">
-                <RiseText text="made simple." delay={230} />
-              </span>
-            </h1>
-          </div>
-          <p className="fade-up max-w-xl text-lg leading-relaxed text-soft md:text-xl" style={{ animationDelay: "440ms" }}>
-            The hard topics, untangled in thirty-second clips. Then one-on-one on Zoom with {site.instructor.name}, CFI, until it clicks.
-          </p>
-          <div className="fade-up flex flex-wrap gap-3" style={{ animationDelay: "560ms" }}>
-            <Link href="/book" className="btn btn-primary">
-              Book a session
-            </Link>
-            <a href="#fly" className="btn btn-ghost !border-white/35">
-              <span className="md:hidden">Fly the game</span>
-              <span className="hidden md:inline">Fly the landing game</span>
-            </a>
-          </div>
+        </h1>
+        <p className="fade-up max-w-xl text-lg leading-relaxed text-soft md:text-xl" style={{ animationDelay: "440ms" }}>
+          The hard topics, untangled in thirty-second clips. Then one-on-one on Zoom with {site.instructor.name}, CFI, until it clicks.
+        </p>
+        <div className="fade-up flex flex-wrap justify-center gap-3" style={{ animationDelay: "560ms" }}>
+          <Link href="/book" className="btn btn-primary">
+            Book a session
+          </Link>
+          <a href="#fly" className="btn btn-ghost !border-white/35">
+            <span className="md:hidden">Fly the game</span>
+            <span className="hidden md:inline">Fly the landing game</span>
+          </a>
         </div>
       </div>
-
-      <a
-        href="#stats"
-        className="press absolute bottom-6 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-2 font-mono text-[10px] tracking-[3px] text-dim hover:text-ink md:flex"
-        aria-label="Scroll down"
-      >
-        SCROLL
-        <span className="h-8 w-px overflow-hidden bg-white/10">
-          <span className="scroll-cue block h-full w-full bg-cyan" />
-        </span>
-      </a>
     </section>
   );
 }
@@ -387,7 +368,7 @@ function Cta() {
         </div>
         <div className="reveal flex flex-col items-center gap-4 rounded-3xl bg-white/[.04] p-10 text-center ring-1 ring-white/[.09] backdrop-blur-md">
           <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-black shadow-[0_12px_40px_rgba(0,0,0,.65)] ring-1 ring-white/10">
-            <LogoMark size={40} />
+            <LogoMark size={64} glow />
           </span>
           <span className="font-display text-2xl font-semibold">AlreadyAirborne</span>
           <span className="font-mono text-[10px] tracking-[.2em] text-dim">HARD TOPICS · THIRTY SECONDS</span>

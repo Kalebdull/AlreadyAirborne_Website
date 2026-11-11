@@ -9,7 +9,7 @@ export function TopBar() {
     <div className="border-b border-white/5 bg-[#050608]">
       <div className="mx-auto flex h-10 max-w-[1180px] items-center justify-between gap-4 px-6 text-[12px]">
         <Link href="/" className="press flex items-center gap-2 text-dim hover:text-ink">
-          <LogoMark size={18} />
+          <LogoMark size={20} />
           <span className="font-mono tracking-[.1em]">ALREADYAIRBORNE</span>
         </Link>
         <p className="hidden text-mute md:block">
