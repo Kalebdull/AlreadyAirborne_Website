@@ -1,7 +1,6 @@
 """Hero loop: a tangle of flight paths and jargon that collapses into the
-AlreadyAirborne "A" (src/components/logo.tsx). A solid chrome A swings in,
-sparks and a shockwave burst off it, light sweeps across it, then it all
-tangles again. Seamless 8 s loop.
+AlreadyAirborne "A" (src/components/logo.tsx). A solid chrome A fades up
+inside the outline, light sweeps across it, then it all tangles again. Seamless 8 s loop.
 
 Each web size is rendered natively (no cropping or re-encoding), so it stays
 sharp on high-density screens:
@@ -60,7 +59,7 @@ JARGON = [
 
 # Timeline (frames)
 TANGLE_END, MERGE_END = 54, 118
-LOCK = 128  # the chrome A lands square to camera: burst + shockwave
+LOCK = 128  # the chrome A is fully lit
 HOLD_END, UNMERGE_END = 172, 226
 
 rng = random.Random(7)
@@ -222,7 +221,7 @@ for shape_index, count in enumerate(STRANDS_PER_SHAPE):
             em.inputs["Color"].default_value = lin(ICE) if v else lin(base)
             em.inputs["Color"].keyframe_insert("default_value", frame=f)
         # Bright as they lock on, then settle into a rim light on the chrome.
-        key(em.inputs["Strength"], [(0, 2.0), (TANGLE_END + d, 2.0), (MERGE_END - 6 + d // 2, 7.0), (LOCK + 14, 2.6), (HOLD_END, 2.6), (UNMERGE_END - 18 + d, 2.0), (END, 2.0)])
+        key(em.inputs["Strength"], [(0, 2.0), (TANGLE_END + d, 2.0), (MERGE_END - 6 + d // 2, 4.5), (LOCK + 14, 2.4), (HOLD_END, 2.6), (UNMERGE_END - 18 + d, 2.0), (END, 2.0)])
 
         ax = [rng.uniform(-0.5, 0.5) for _ in range(3)]
         for f, s in [(0, 0), (TANGLE_END, 1), (MERGE_END, 0), (HOLD_END, 0), (UNMERGE_END, -0.8), (END, 0)]:
@@ -230,7 +229,7 @@ for shape_index, count in enumerate(STRANDS_PER_SHAPE):
             ob.keyframe_insert("rotation_euler", frame=f)
         i += 1
 
-# --- The chrome A: extruded, bevelled, swings in square to camera -----------------
+# --- The chrome A: extruded and bevelled, fades up inside the outline -----------------
 chrome = bpy.data.materials.new("chrome")
 chrome.use_nodes = True
 nt = chrome.node_tree
@@ -288,11 +287,16 @@ s2 = nt.nodes.new("ShaderNodeMath")
 s2.operation = "ADD"
 nt.links.new(s1.outputs[0], s2.inputs[0])
 nt.links.new(rim.outputs[0], s2.inputs[1])
+# Fade: the A glows up inside the outline the strands have drawn.
+fade = nt.nodes.new("ShaderNodeMath")
+fade.operation = "MULTIPLY"
+nt.links.new(s2.outputs[0], fade.inputs[0])
 em = nt.nodes.new("ShaderNodeEmission")
 nt.links.new(ramp.outputs["Color"], em.inputs["Color"])
-nt.links.new(s2.outputs[0], em.inputs["Strength"])
+nt.links.new(fade.outputs[0], em.inputs["Strength"])
 out = nt.nodes.new("ShaderNodeOutputMaterial")
 nt.links.new(em.outputs[0], out.inputs[0])
+key(fade.inputs[1], [(0, 0), (MERGE_END - 6, 0), (LOCK + 6, 1), (HOLD_END - 4, 1), (HOLD_END + 14, 0), (END, 0)])
 key(sweep_pos.outputs[0], [(0, -2.2), (LOCK + 8, -2.2), (HOLD_END - 2, 2.2), (END, 2.2)])
 
 pivot = bpy.data.objects.new("A", None)
@@ -314,60 +318,14 @@ for s, poly in enumerate(SHAPES):
     bev = ob.modifiers.new("bevel", "BEVEL")
     bev.width, bev.segments, bev.limit_method = 0.014, 3, "ANGLE"
 
-# Swing in from edge-on as the strands lock, swing out as they let go. Hidden
-# (scaled to nothing) the rest of the time so it never blocks the tangle.
-SHOW, HIDE = MERGE_END - 14, HOLD_END + 16
-key_obj(pivot, "rotation_euler", [(0, (0, 0, math.radians(88))), (SHOW, (0, 0, math.radians(88))), (LOCK, (0, 0, 0)), (HOLD_END - 2, (0, 0, 0)), (HIDE, (0, 0, math.radians(-88))), (END, (0, 0, math.radians(-88)))])
-key_obj(pivot, "scale", [(0, (0.0001,) * 3), (SHOW - 1, (0.0001,) * 3), (SHOW, (0.9,) * 3), (LOCK, (1,) * 3), (LOCK + 4, (1.03,) * 3), (LOCK + 12, (1,) * 3), (HIDE, (0.95,) * 3), (HIDE + 1, (0.0001,) * 3), (END, (0.0001,) * 3)])
+# Hidden (scaled to nothing) whenever it isn't showing, so the unlit chrome
+# never blocks strands passing behind it.
+SHOW, HIDE = MERGE_END - 7, HOLD_END + 15
+key_obj(pivot, "scale", [(0, (0.0001,) * 3), (SHOW - 1, (0.0001,) * 3), (SHOW, (1,) * 3), (HIDE, (1,) * 3), (HIDE + 1, (0.0001,) * 3), (END, (0.0001,) * 3)])
 for fc in fcurves(pivot, "scale"):
     for kp in fc.keyframe_points:
         if kp.co[0] in (0, SHOW - 1, HIDE, HIDE + 1):
             kp.interpolation = "CONSTANT"
-
-# --- Lock-in burst: sparks and a shockwave ring ---------------------------------------
-spark_mat, spark_em = emission("spark", lin((0xBF, 0xDB, 0xFF)), 0)
-key(spark_em.inputs["Strength"], [(0, 0), (LOCK - 1, 0), (LOCK, 18), (LOCK + 10, 9), (LOCK + 34, 0), (END, 0)])
-spark_mesh = bpy.data.meshes.new("spark")
-sbm = bmesh.new()
-bmesh.ops.create_uvsphere(sbm, u_segments=12, v_segments=6, radius=0.012)
-sbm.to_mesh(spark_mesh)
-sbm.free()
-spark_mesh.materials.append(spark_mat)
-for k in range(110):
-    ob = bpy.data.objects.new(f"spark{k}", spark_mesh)
-    scene.collection.objects.link(ob)
-    a = rng.uniform(0, math.tau)
-    r = rng.uniform(1.4, 3.6)
-    start = (rng.uniform(-0.6, 0.6), -0.05, rng.uniform(-0.25, 0.25))
-    end = (start[0] + math.cos(a) * r * 1.3, rng.uniform(-1.6, -0.2), start[2] + math.sin(a) * r * 0.75)
-    sc = rng.uniform(0.6, 1.6)
-    key_obj(ob, "location", [(0, start), (LOCK, start), (LOCK + rng.randint(22, 34), end), (END, end)])
-    key_obj(ob, "scale", [(0, (0,) * 3), (LOCK - 1, (0,) * 3), (LOCK, (sc,) * 3), (LOCK + 30, (sc * 0.3,) * 3), (LOCK + 36, (0,) * 3), (END, (0,) * 3)])
-    for fc in fcurves(ob, "location"):
-        kp = fc.keyframe_points[1]
-        kp.interpolation, kp.easing = "EXPO", "EASE_OUT"
-
-ring_mat, ring_em = emission("ring", lin((0x7F, 0xB2, 0xFF)), 0)
-key(ring_em.inputs["Strength"], [(0, 0), (LOCK - 1, 0), (LOCK, 9), (LOCK + 18, 0), (END, 0)])
-ring_mesh = bpy.data.meshes.new("ring")
-rbm = bmesh.new()
-segs = 160
-verts = [rbm.verts.new((math.cos(t), 0, math.sin(t))) for t in (k / segs * math.tau for k in range(segs))]
-for k in range(segs):
-    rbm.edges.new((verts[k], verts[(k + 1) % segs]))
-rbm.to_mesh(ring_mesh)
-rbm.free()
-ring = bpy.data.objects.new("ring", ring_mesh)
-scene.collection.objects.link(ring)
-skin = ring.modifiers.new("thick", "SKIN")
-for v in ring_mesh.skin_vertices[0].data:
-    v.radius = (0.004, 0.004)
-ring.data.materials.append(ring_mat)
-ring.location = (0, 0.05, world((CX, 640))[2])
-key_obj(ring, "scale", [(0, (0.2, 1, 0.2)), (LOCK, (0.2, 1, 0.2)), (LOCK + 22, (4.6, 1, 2.6)), (END, (4.6, 1, 2.6))])
-for fc in fcurves(ring, "scale"):
-    kp = fc.keyframe_points[1]
-    kp.interpolation, kp.easing = "EXPO", "EASE_OUT"
 
 # --- Soft blue bloom behind the A ---------------------------------------------------
 halo = bpy.data.materials.new("halo")
@@ -390,7 +348,7 @@ h.links.new(hlen.outputs["Value"], hmap.inputs["Value"])
 hmul = h.nodes.new("ShaderNodeMath")
 hmul.operation = "MULTIPLY"
 h.links.new(hmap.outputs["Result"], hmul.inputs[0])
-key(hmul.inputs[1], [(0, 0.04), (MERGE_END - 10, 0.1), (LOCK, 0.5), (LOCK + 24, 0.24), (HOLD_END, 0.2), (UNMERGE_END, 0.04), (END, 0.04)])
+key(hmul.inputs[1], [(0, 0.03), (MERGE_END - 10, 0.06), (LOCK + 10, 0.16), (HOLD_END, 0.14), (UNMERGE_END, 0.03), (END, 0.03)])
 hem = h.nodes.new("ShaderNodeEmission")
 hem.inputs["Color"].default_value = lin((0x2A, 0x5C, 0xC8))
 h.links.new(hmul.outputs[0], hem.inputs["Strength"])
