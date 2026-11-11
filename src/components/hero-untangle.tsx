@@ -3,20 +3,20 @@
 import { useEffect, useRef } from "react";
 
 // "Aviation, made simple": an Eevee-rendered loop (design/blender/untangle.py)
-// of tangled flight paths and jargon collapsing into the flight path marker.
+// of tangled flight paths and jargon collapsing into the chrome AlreadyAirborne A.
 //
-// A still of the finished marker sits underneath, and the video stays
-// invisible until it is actually playing. When a phone refuses to autoplay
-// (iPhone Low Power Mode), visitors see the still, never a play button.
+// A still of the finished A sits underneath, and the video stays invisible
+// until it is actually playing. When a phone refuses to autoplay (iPhone Low
+// Power Mode), visitors see the still, never a play button.
 //
-// Phones get their own cut (design/blender/phone_cut.py): cropped to the
-// marker and about a fifth of the size, so it starts fast and plays smoothly.
+// Phones and desktops each get a version rendered at the exact size they're
+// shown (1040x900 and 2000x876), so it stays sharp on high-density screens.
 //
 // The <video> is written as raw HTML on purpose: React sets `muted` as a
 // property, not an attribute, and iOS only autoplays videos whose server
 // markup says muted.
 const ARIA = "A tangle of colored flight paths and aviation jargon untangling into one clean flight path marker, then tangling again.";
-const HOLD = 4.6; // seconds into the loop where the marker is fully formed (matches the still)
+const HOLD = 160 / 30; // seconds into the loop where the A is fully formed and settled (matches the still)
 
 export function HeroUntangle({ className }: { className?: string }) {
   const wrap = useRef<HTMLDivElement>(null);
