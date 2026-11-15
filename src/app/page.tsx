@@ -19,14 +19,14 @@ export default function Home() {
       <Hero />
       <TopicMarquee />
       <StatBand />
+      <Pricing />
+      <HowItWorks />
       <Mission />
       <GameSection>
         <div className="scroll-settle flex w-full justify-center">
           <Pfd />
         </div>
       </GameSection>
-      <Pricing />
-      <HowItWorks />
       <Faq />
       <Cta />
     </main>
@@ -133,7 +133,7 @@ function Mission() {
   ];
   const { instructor } = site;
   return (
-    <section id="about" className="scroll-mt-20 px-6 py-14 md:py-20">
+    <section id="about" className="scroll-mt-20 border-t border-line px-6 py-14 md:py-20">
       <div className="mx-auto flex max-w-[1180px] flex-col gap-9 md:gap-10">
         <SectionHeader
           eyebrow="Why I teach this way"
