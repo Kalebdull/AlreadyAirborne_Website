@@ -35,7 +35,7 @@ export default async function LibraryPage() {
             <h1 className="headline text-[48px] md:text-[72px]">
               Hard topics.
               <br />
-              <span className="text-dim">Thirty seconds each.</span>
+              <span className="text-dim">Short and simple.</span>
             </h1>
           </div>
           {viewer ? (

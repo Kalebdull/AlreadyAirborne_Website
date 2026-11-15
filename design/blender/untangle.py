@@ -35,19 +35,16 @@ POINTS = 220
 MARK_W = 2.6  # world width of the A
 K = MARK_W / 664  # logo viewBox units -> world
 CX, CY = 628, 604  # centre of the logo viewBox
-DEPTH = 0.16  # extrusion of the chrome A
+DEPTH = 0.08  # extrusion of the chrome A
 
 # Same paths as src/components/logo.tsx (viewBox 296 400 664 408).
 LOGO_PATHS = [
-    "M628 400L770 630H704L628 505L552 630H486Z",
-    "M296 555C330 568 350 590 372 602L628 642L884 602C906 590 926 568 960 555C944 592 916 622 876 630L826 652L842 668L790 662L628 690L466 662L414 668L430 652L380 630C340 622 312 592 296 555Z",
-    "M471 674H533L460 808H385Z",
-    "M723 674H785L871 808H796Z",
+    "M628 400L880 808H836L628 471L420 808H376Z",
+    "M300 556C420 596 524 622 628 636C732 622 836 596 956 556C840 610 736 646 628 660C520 646 416 610 300 556Z",
 ]
-# The strands trace what you can see: the peak's outline stops at the wing.
-OUTLINE_PATHS = ["M628 400L765 621L705 631L628 505L551 631L491 621Z"] + LOGO_PATHS[1:]
-FRONT = [0.0, -0.03, 0.0, 0.0]  # the wing sits in front of the peak it crosses
-STRANDS_PER_SHAPE = [10, 14, 6, 6]
+OUTLINE_PATHS = LOGO_PATHS
+FRONT = [0.0, -0.03]  # the wing sits in front of the A it crosses
+STRANDS_PER_SHAPE = [12, 10]
 
 COLORS = [(0x22, 0xD3, 0xEE), (0xF0, 0x48, 0xC8), (0xFB, 0xBF, 0x24), (0x4A, 0xDE, 0x80), (0xF8, 0x71, 0x71), (0xA7, 0x8B, 0xFA)]
 ICE = (0x8F, 0xBE, 0xFF)
@@ -195,7 +192,7 @@ for shape_index, count in enumerate(STRANDS_PER_SHAPE):
         p = [rng.uniform(1, 2.4), rng.uniform(1, 3.2), rng.uniform(1, 2.8), rng.uniform(1, 2.4)] + [rng.uniform(0, math.tau) for _ in range(4)]
         cu = bpy.data.curves.new(f"strand{i}", "CURVE")
         cu.dimensions = "3D"
-        cu.bevel_depth = 0.0105
+        cu.bevel_depth = 0.0045
         cu.bevel_resolution = 3
         sp = cu.splines.new("POLY")
         sp.points.add(POINTS - 1)
@@ -316,7 +313,7 @@ for s, poly in enumerate(SHAPES):
     scene.collection.objects.link(ob)
     ob.parent = pivot
     bev = ob.modifiers.new("bevel", "BEVEL")
-    bev.width, bev.segments, bev.limit_method = 0.014, 3, "ANGLE"
+    bev.width, bev.segments, bev.limit_method = 0.008, 3, "ANGLE"
 
 # Hidden (scaled to nothing) whenever it isn't showing, so the unlit chrome
 # never blocks strands passing behind it.

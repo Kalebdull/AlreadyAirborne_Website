@@ -31,7 +31,7 @@ export async function SiteHeader() {
           </span>
           <span className="flex flex-col leading-none">
             <span className="font-display text-[16px] font-semibold tracking-[-.01em]">AlreadyAirborne</span>
-            <span className="mt-1 font-mono text-[9px] tracking-[.16em] text-dim">HARD TOPICS · 30 SEC</span>
+            <span className="mt-1 font-mono text-[9px] tracking-[.16em] text-dim">HARD TOPICS · SIMPLE</span>
           </span>
         </Link>
 

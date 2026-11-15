@@ -15,7 +15,7 @@ export function SiteFooter() {
         <div className="grid grid-cols-3 gap-x-4 gap-y-10 md:grid-cols-[1.5fr_repeat(3,1fr)] md:gap-10">
           <div className="col-span-3 flex flex-col gap-4 md:col-span-1">
             <span className="font-display text-xl font-semibold">{site.name}</span>
-            <span className="font-mono text-[10px] tracking-[.2em] text-cyan">HARD TOPICS · THIRTY SECONDS</span>
+            <span className="font-mono text-[10px] tracking-[.2em] text-cyan">HARD TOPICS · MADE SIMPLE</span>
             <p className="max-w-[320px] text-[14px] leading-relaxed text-mute">
               Short explainers, then one-on-one on Zoom with {site.instructor.name}, CFI · {site.instructor.location}.
             </p>

@@ -1,13 +1,11 @@
 import { useId } from "react";
 
-// The AlreadyAirborne "A": a peak, a swept wing across it, and two legs.
-// Traced from design/brand/logo-a.png. Shapes overlap on purpose (the peak
-// tucks under the wing), so it relies on the default nonzero fill rule.
+// The AlreadyAirborne "A": a thin A with a swept wing across it. A simplified
+// take on design/brand/logo-a.png. The two shapes overlap where the wing
+// crosses the legs.
 export const LOGO_PATHS = [
-  "M628 400L770 630H704L628 505L552 630H486Z",
-  "M296 555C330 568 350 590 372 602L628 642L884 602C906 590 926 568 960 555C944 592 916 622 876 630L826 652L842 668L790 662L628 690L466 662L414 668L430 652L380 630C340 622 312 592 296 555Z",
-  "M471 674H533L460 808H385Z",
-  "M723 674H785L871 808H796Z",
+  "M628 400L880 808H836L628 471L420 808H376Z",
+  "M300 556C420 596 524 622 628 636C732 622 836 596 956 556C840 610 736 646 628 660C520 646 416 610 300 556Z",
 ];
 export const LOGO_VIEWBOX = "296 400 664 408";
 const ASPECT = 408 / 664;

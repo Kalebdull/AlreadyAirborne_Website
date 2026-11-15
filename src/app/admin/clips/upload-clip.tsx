@@ -39,7 +39,7 @@ export function UploadClip({ topics }: { topics: Topic[] }) {
     const hasPoster = poster && poster.size > 0;
 
     if (hasVideo && video.size > MAX_BYTES) {
-      setStatus({ tone: "error", text: `That video is ${(video.size / 1048576).toFixed(0)} MB. Export it under 50 MB (720p works great for 30-second reels).` });
+      setStatus({ tone: "error", text: `That video is ${(video.size / 1048576).toFixed(0)} MB. Export it under 50 MB (720p works great for short reels).` });
       return;
     }
 

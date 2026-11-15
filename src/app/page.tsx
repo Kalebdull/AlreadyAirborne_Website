@@ -78,7 +78,7 @@ function Hero() {
           </span>
         </h1>
         <p className="fade-up max-w-xl text-lg leading-relaxed text-soft md:text-xl" style={{ animationDelay: "440ms" }}>
-          The hard topics, untangled in thirty-second clips. Then one-on-one on Zoom with {site.instructor.name}, CFI, until it clicks.
+          The hard topics, untangled in short clips. Then one-on-one on Zoom with {site.instructor.name}, CFI, until it clicks.
         </p>
         <div className="fade-up flex flex-wrap justify-center gap-3" style={{ animationDelay: "560ms" }}>
           <Link href="/book" className="btn btn-primary">
@@ -98,7 +98,7 @@ function Hero() {
 
 function StatBand() {
   const stats = [
-    { value: "30s", label: "Per clip", sub: "Hard topics, short and visual", color: "text-cyan", bar: "bg-cyan" },
+    { value: "Free", label: "Clips", sub: "Hard topics, short and visual", color: "text-cyan", bar: "bg-cyan" },
     { value: "$50", label: "Per hour", sub: "1-on-1 on Zoom", color: "text-green", bar: "bg-green" },
     { value: "$175", label: "Mock oral", sub: "Private or Commercial", color: "text-magenta", bar: "bg-magenta" },
     { value: "10", label: "Levels", sub: "Landings in the flight game", color: "text-amber", bar: "bg-amber" },
@@ -127,7 +127,7 @@ function StatBand() {
 function Mission() {
   const pillars = [
     { title: "Relatable ideas", body: "Every topic gets an everyday comparison, so it sticks after the lesson ends.", color: "var(--color-cyan)", text: "text-cyan", Icon: BulbIcon },
-    { title: "Short and visual", body: "Thirty-second clips you can rewatch the night before a lesson or checkride.", color: "var(--color-magenta)", text: "text-magenta", Icon: PlayIcon },
+    { title: "Short and visual", body: "Short clips you can rewatch the night before a lesson or checkride.", color: "var(--color-magenta)", text: "text-magenta", Icon: PlayIcon },
     { title: "One-on-one", body: "On Zoom, at your pace, on exactly what you're stuck on.", color: "var(--color-green)", text: "text-green", Icon: VideoIcon },
     { title: "Checkride ready", body: "Mock orals built on the ACS, with a debrief on where you're weak.", color: "var(--color-amber)", text: "text-amber", Icon: ClipboardIcon },
   ];
@@ -371,7 +371,7 @@ function Cta() {
             <LogoMark size={64} glow />
           </span>
           <span className="font-display text-2xl font-semibold">AlreadyAirborne</span>
-          <span className="font-mono text-[10px] tracking-[.2em] text-dim">HARD TOPICS · THIRTY SECONDS</span>
+          <span className="font-mono text-[10px] tracking-[.2em] text-dim">HARD TOPICS · MADE SIMPLE</span>
           <span aria-hidden className="accent-rule" />
           <span className="font-mono text-[11px] tracking-[.14em] text-soft">
             {site.instructor.name.toUpperCase()}, CFI · {site.instructor.location.toUpperCase()}

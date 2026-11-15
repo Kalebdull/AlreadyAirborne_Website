@@ -23,11 +23,11 @@ const jetbrains = JetBrains_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
   title: {
-    default: "AlreadyAirborne · Hard topics. Thirty seconds.",
+    default: "AlreadyAirborne · Hard topics, made simple.",
     template: "%s · AlreadyAirborne",
   },
   description:
-    "30-second explainers on the topics student pilots struggle with, plus 1-on-1 Zoom tutoring and mock oral exams with Kaleb Dull, a CFI in San Jose, CA.",
+    "Short explainers on the topics student pilots struggle with, plus 1-on-1 Zoom tutoring and mock oral exams with Kaleb Dull, a CFI in San Jose, CA.",
 };
 
 export const viewport: Viewport = {
