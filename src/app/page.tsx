@@ -163,10 +163,10 @@ function Mission() {
         </div>
 
         <div className="card reveal flex flex-col overflow-hidden md:flex-row">
-          <div className="relative flex aspect-[4/3] overflow-hidden bg-raised md:aspect-auto md:min-h-[520px] md:basis-[44%]">
+          <div className="relative flex aspect-square overflow-hidden bg-raised md:aspect-auto md:min-h-[520px] md:basis-[44%]">
             {instructor.photo && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={instructor.photo} alt={instructor.photoAlt} className="absolute inset-0 h-full w-full object-cover object-[60%_35%]" />
+              <img src={instructor.photo} alt={instructor.photoAlt} className="absolute inset-0 h-full w-full object-cover object-[60%_8%]" />
             )}
             <div aria-hidden className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent" />
             <div aria-hidden className="grain" />
