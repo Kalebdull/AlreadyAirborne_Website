@@ -69,12 +69,20 @@ export default async function LibraryPage() {
             <section key={topic.id} id={topic.slug} className="flex scroll-mt-20 flex-col gap-6">
               <div className="flex items-baseline justify-between gap-4 border-b border-line pb-4">
                 <h2 className="font-display text-[28px] font-semibold tracking-[-.02em] md:text-[34px]">{topic.name}</h2>
-                <span className="font-mono text-xs text-dim">
-                  {viewer ? `${topicClips.filter((c) => watched.has(c.id)).length} / ` : ""}
-                  {topicClips.length} CLIPS
+                <span className="flex items-center gap-3 font-mono text-xs text-dim">
+                  <span>
+                    {viewer ? `${topicClips.filter((c) => watched.has(c.id)).length} / ` : ""}
+                    {topicClips.length} {topicClips.length === 1 ? "CLIP" : "CLIPS"}
+                  </span>
+                  {topicClips.length > 2 && (
+                    <span className="flex items-center gap-1 rounded-full bg-cyan/10 px-2.5 py-1 text-cyan ring-1 ring-cyan/25 md:hidden">
+                      SWIPE <span aria-hidden className="swipe-nudge inline-block">→</span>
+                    </span>
+                  )}
                 </span>
               </div>
-              <div className="-mx-6 flex snap-x gap-4 overflow-x-auto px-6 pb-2 md:mx-0 md:grid md:grid-cols-4 md:overflow-visible md:px-0 lg:grid-cols-5">
+              <div className="relative -mx-6 md:mx-0">
+              <div className="flex snap-x gap-4 overflow-x-auto px-6 pb-2 md:grid md:grid-cols-4 md:overflow-visible md:px-0 lg:grid-cols-5">
                 {topicClips.map((clip, i) => (
                   <ClipCard
                     key={clip.id}
@@ -84,6 +92,11 @@ export default async function LibraryPage() {
                     poster={clip.poster_path ? posters.get(clip.poster_path) : undefined}
                   />
                 ))}
+              </div>
+              {/* Phones: the row scrolls sideways. A fade on the right edge says there's more. */}
+              {topicClips.length > 2 && (
+                <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-14 bg-gradient-to-l from-[var(--color-page)] to-transparent md:hidden" />
+              )}
               </div>
             </section>
           );
@@ -97,7 +110,7 @@ function ClipCard({ clip, index, watched, poster }: { clip: Clip; index: number;
   return (
     <Link
       href={`/library/${clip.id}`}
-      className="group flex w-[46vw] max-w-[220px] shrink-0 snap-start flex-col gap-3 md:w-auto md:max-w-none"
+      className="group flex w-[40vw] max-w-[200px] shrink-0 snap-start flex-col gap-3 md:w-auto md:max-w-none"
     >
       <ViewTransition name={`clip-${clip.id}`} share="morph" default="none">
       <div className="relative aspect-[9/16] overflow-hidden rounded-[22px] bg-card shadow-[0_0_0_1px_#2c2c2e] transition-transform duration-500 group-hover:-translate-y-1.5">

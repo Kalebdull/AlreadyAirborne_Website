@@ -568,3 +568,11 @@ html {
   display: none !important;
   -webkit-appearance: none;
 }
+
+/* Library: the "SWIPE →" arrow nudges sideways so phone users know rows scroll. */
+@keyframes swipe-nudge {
+  0%, 60%, 100% { transform: translateX(0); }
+  30% { transform: translateX(4px); }
+}
+.swipe-nudge { animation: swipe-nudge 1.6s var(--ease, ease) infinite; }
+@media (prefers-reduced-motion: reduce) { .swipe-nudge { animation: none; } }

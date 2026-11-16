@@ -264,7 +264,7 @@ function Pricing() {
             description="Every reel, organized by topic, with your progress saved."
             price="$0"
             sub="always"
-            items={["Airspace, weather, regs and more", "Instrument 101 series", "Track what you've watched"]}
+            items={["Airspace, weather, regs and more", "Instruments, navigation and engines", "Track what you've watched"]}
             cta={{ href: "/signup?next=/library", label: "Create free account" }}
             note="No card, no catch."
           />
