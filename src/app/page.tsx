@@ -131,7 +131,7 @@ function EngineClip() {
         </div>
         <div className="reveal relative mx-auto w-[min(78vw,320px)] md:w-[340px]">
           <div aria-hidden className="pointer-events-none absolute -inset-16 bg-[radial-gradient(closest-side,rgba(251,146,60,.18),transparent)]" />
-          <FeaturedClip src="/clips/engine.mp4" poster="/clips/engine.jpg" label="How a Cessna 172's Lycoming engine works: the four strokes, firing order and magnetos." />
+          <FeaturedClip src="/clips/engine.mp4?v=2" poster="/clips/engine.jpg" label="How a Cessna 172's Lycoming engine works: the four strokes, firing order and magnetos." />
         </div>
       </div>
     </section>
