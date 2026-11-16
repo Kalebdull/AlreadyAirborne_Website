@@ -9,6 +9,7 @@ import { TopicMarquee } from "@/components/topic-marquee";
 import { Faq } from "@/components/faq";
 import { SectionHeader } from "@/components/section-header";
 import { LogoMark } from "@/components/logo";
+import { FeaturedClip } from "@/components/featured-clip";
 import { BulbIcon, ClipboardIcon, PlayIcon, VideoIcon } from "@/components/icons";
 
 // Section order follows the Prestige layout kit; colors, type and components
@@ -19,6 +20,7 @@ export default function Home() {
       <Hero />
       <TopicMarquee />
       <StatBand />
+      <EngineClip />
       <Pricing />
       <HowItWorks />
       <Mission />
@@ -88,6 +90,48 @@ function Hero() {
             <span className="md:hidden">Fly the game</span>
             <span className="hidden md:inline">Fly the landing game</span>
           </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// --- Featured clip: a real reel, so visitors see the teaching first -------------
+function EngineClip() {
+  const beats = ["Four strokes", "Firing order 1-3-2-4", "Two magnetos", "No battery needed"];
+  return (
+    <section id="watch" className="scroll-mt-20 overflow-hidden px-6 py-14 md:py-20">
+      <div className="mx-auto grid max-w-[1180px] items-center gap-10 md:grid-cols-[1fr_auto] md:gap-16">
+        <div className="flex flex-col gap-6">
+          <SectionHeader
+            eyebrow="Watch one"
+            align="left"
+            title={
+              <>
+                How a 172 engine works. <span className="text-dim">Explained in under a minute.</span>
+              </>
+            }
+            intro="Inside the Lycoming IO-360 that pulls a Cessna 172. This is what every clip in the library looks like."
+          />
+          <ul className="reveal flex flex-wrap gap-2">
+            {beats.map((b) => (
+              <li key={b} className="rounded-full bg-white/5 px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[.14em] text-soft ring-1 ring-white/10">
+                {b}
+              </li>
+            ))}
+          </ul>
+          <div className="reveal flex flex-wrap gap-3">
+            <Link href="/library" className="btn btn-primary">
+              Watch more in the library
+            </Link>
+            <Link href="/book" className="btn btn-ghost">
+              Book a session
+            </Link>
+          </div>
+        </div>
+        <div className="reveal relative mx-auto w-[min(78vw,320px)] md:w-[340px]">
+          <div aria-hidden className="pointer-events-none absolute -inset-16 bg-[radial-gradient(closest-side,rgba(251,146,60,.18),transparent)]" />
+          <FeaturedClip src="/clips/engine.mp4" poster="/clips/engine.jpg" label="How a Cessna 172's Lycoming engine works: the four strokes, firing order and magnetos." />
         </div>
       </div>
     </section>
